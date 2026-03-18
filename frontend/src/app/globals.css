@@ -3,8 +3,7 @@
 @tailwind utilities;
 
 /* ─── CipherDEX Design System ─────────────────────────────── */
-
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+/* Fonts loaded via <link> in layout.tsx to avoid @import path issues */
 
 :root {
   /* Void palette — near-black with blue undertones */
