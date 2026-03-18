@@ -2,100 +2,196 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── CipherDEX Design System ─────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
 :root {
-  --color-bg-primary: #0a0b14;
-  --color-bg-secondary: #111227;
-  --color-bg-card: #161832;
-  --color-bg-card-hover: #1c1e3a;
-  --color-border: rgba(139, 92, 246, 0.15);
-  --color-border-active: rgba(139, 92, 246, 0.4);
-  --color-text-primary: #f0f0f5;
-  --color-text-secondary: #9ca3af;
-  --color-text-muted: #6b7280;
-  --color-accent-purple: #8b5cf6;
-  --color-accent-blue: #3b82f6;
-  --color-accent-cyan: #06b6d4;
-  --color-accent-green: #10b981;
-  --color-accent-red: #ef4444;
-  --color-accent-amber: #f59e0b;
+  /* Void palette — near-black with blue undertones */
+  --void-0: #04050a;
+  --void-1: #080a14;
+  --void-2: #0c0e1c;
+  --void-3: #111425;
+  --void-4: #161a2e;
+  --void-5: #1c2038;
+
+  /* Cipher accent — electric violet to cold cyan */
+  --cipher-violet: #a855f7;
+  --cipher-blue: #6366f1;
+  --cipher-cyan: #22d3ee;
+  --cipher-green: #34d399;
+  --cipher-red: #f87171;
+  --cipher-amber: #fbbf24;
+
+  /* Text */
+  --text-primary: #eeeef2;
+  --text-secondary: #8b8fa3;
+  --text-muted: #4b4f68;
+
+  /* Borders */
+  --border-subtle: rgba(99, 102, 241, 0.08);
+  --border-default: rgba(99, 102, 241, 0.15);
+  --border-active: rgba(168, 85, 247, 0.4);
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  background: var(--color-bg-primary);
-  color: var(--color-text-primary);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--void-0);
+  color: var(--text-primary);
+  font-family: 'Outfit', system-ui, sans-serif;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
-/* Glass morphism utility */
+/* ─── Glass ────────────────────────────────────────────────── */
 .glass {
-  background: rgba(22, 24, 50, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(139, 92, 246, 0.15);
+  background: rgba(12, 14, 28, 0.6);
+  backdrop-filter: blur(20px) saturate(1.2);
+  border: 1px solid var(--border-subtle);
 }
 
-.glass-hover:hover {
-  background: rgba(28, 30, 58, 0.8);
-  border-color: rgba(139, 92, 246, 0.3);
+.glass-elevated {
+  background: rgba(16, 18, 36, 0.8);
+  backdrop-filter: blur(24px) saturate(1.3);
+  border: 1px solid var(--border-default);
+  box-shadow:
+    0 0 0 1px rgba(99, 102, 241, 0.05),
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Gradient text */
+/* ─── Gradient text ────────────────────────────────────────── */
 .gradient-text {
-  background: linear-gradient(135deg, #8b5cf6, #3b82f6, #06b6d4);
+  background: linear-gradient(135deg, #a855f7 0%, #6366f1 40%, #22d3ee 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* Gradient border */
-.gradient-border {
-  position: relative;
-  border: 1px solid transparent;
-  background-clip: padding-box;
+.gradient-text-warm {
+  background: linear-gradient(135deg, #f59e0b 0%, #ef4444 50%, #a855f7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.gradient-border::before {
+/* ─── Cipher shimmer — the "encrypted data" effect ─────────── */
+@keyframes cipher-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.cipher-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--text-muted) 0%,
+    var(--cipher-violet) 25%,
+    var(--cipher-cyan) 50%,
+    var(--cipher-violet) 75%,
+    var(--text-muted) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: cipher-shimmer 3s linear infinite;
+}
+
+/* ─── Ambient glow ─────────────────────────────────────────── */
+@keyframes ambient-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.05); }
+}
+
+.ambient-glow {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(120px);
+  pointer-events: none;
+  z-index: 0;
+  animation: ambient-pulse 8s ease-in-out infinite;
+}
+
+/* ─── Grain overlay — adds texture to flat backgrounds ─────── */
+.grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.4;
+}
+
+/* ─── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.2);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.4); }
+
+/* ─── Nav item hover underline ─────────────────────────────── */
+.nav-indicator {
+  position: relative;
+}
+.nav-indicator::after {
   content: "";
   position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(59, 130, 246, 0.3), rgba(6, 182, 212, 0.3));
-  z-index: -1;
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  padding: 1px;
+  left: 0;
+  bottom: -1px;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cipher-violet), var(--cipher-cyan));
+  border-radius: 1px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.nav-indicator:hover::after,
+.nav-indicator.active::after {
+  transform: scaleX(1);
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* ─── Focus ring ───────────────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid var(--cipher-violet);
+  outline-offset: 2px;
 }
 
-::-webkit-scrollbar-track {
-  background: var(--color-bg-primary);
+/* ─── Selection ────────────────────────────────────────────── */
+::selection {
+  background: rgba(168, 85, 247, 0.3);
+  color: white;
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.3);
-  border-radius: 3px;
+/* ─── Mono font utility ───────────────────────────────────── */
+.font-mono-cipher {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(139, 92, 246, 0.5);
+/* ─── Stagger animations ──────────────────────────────────── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Glow animation for active states */
-@keyframes glow-pulse {
-  0%, 100% {
-    box-shadow: 0 0 5px rgba(139, 92, 246, 0.2), 0 0 20px rgba(139, 92, 246, 0.1);
-  }
-  50% {
-    box-shadow: 0 0 10px rgba(139, 92, 246, 0.4), 0 0 30px rgba(139, 92, 246, 0.2);
-  }
+.animate-fade-up {
+  animation: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
 }
 
-.glow-pulse {
-  animation: glow-pulse 2s ease-in-out infinite;
-}
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+.stagger-7 { animation-delay: 0.35s; }
+.stagger-8 { animation-delay: 0.4s; }
