@@ -40,12 +40,14 @@ contract OrderBook is ReentrancyGuard, FHEConstants {
     error InvalidState();
     error Paused();
 
+    // NOTE: amountSell intentionally excluded from event to prevent
+    // event-scanning bots from building liquidity maps. Amount is
+    // queryable via getOrder() view function for legitimate users.
     event OrderCreated(
         uint256 indexed orderId,
         address indexed maker,
         address tokenSell,
         address tokenBuy,
-        uint256 amountSell,
         OrderSide side
     );
     event OrderFilled(uint256 indexed orderId, address indexed taker);
@@ -101,7 +103,7 @@ contract OrderBook is ReentrancyGuard, FHEConstants {
 
         activeOrderIds.push(orderId);
 
-        emit OrderCreated(orderId, msg.sender, tokenSell, tokenBuy, amountSell, side);
+        emit OrderCreated(orderId, msg.sender, tokenSell, tokenBuy, side);
     }
 
     /// @notice Taker fills an order with their encrypted price

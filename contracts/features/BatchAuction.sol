@@ -61,8 +61,9 @@ contract BatchAuction is ReentrancyGuard, FHEConstants {
     mapping(uint256 => euint128) private encClearingPrice;
 
     event RoundCreated(uint256 indexed roundId, address tokenA, address tokenB, uint256 endTime);
-    event BuyOrderSubmitted(uint256 indexed roundId, address indexed buyer, uint256 amount);
-    event SellOrderSubmitted(uint256 indexed roundId, address indexed seller, uint256 amount);
+    // NOTE: amounts excluded from events to prevent order imbalance inference
+    event BuyOrderSubmitted(uint256 indexed roundId, address indexed buyer);
+    event SellOrderSubmitted(uint256 indexed roundId, address indexed seller);
     event RoundClosed(uint256 indexed roundId);
     event ClearingPriceRevealed(uint256 indexed roundId, uint256 price);
     event RoundSettled(uint256 indexed roundId);
@@ -133,7 +134,7 @@ contract BatchAuction is ReentrancyGuard, FHEConstants {
         }));
 
         round.totalBuyVolume += amount;
-        emit BuyOrderSubmitted(roundId, msg.sender, amount);
+        emit BuyOrderSubmitted(roundId, msg.sender);
     }
 
     /// @notice Submit a sell order with encrypted min price
@@ -159,7 +160,7 @@ contract BatchAuction is ReentrancyGuard, FHEConstants {
         }));
 
         round.totalSellVolume += amount;
-        emit SellOrderSubmitted(roundId, msg.sender, amount);
+        emit SellOrderSubmitted(roundId, msg.sender);
     }
 
     /// @notice Close round and compute clearing price using price ladder
