@@ -126,7 +126,7 @@ export default function PortfolioPage() {
                 >
                   <Lock size={20} className="text-purple-400" />
                   <span className="text-lg font-semibold text-purple-300 group-hover:text-purple-200 transition-colors">
-                    Click to unseal
+                    Click to view
                   </span>
                   <Eye size={16} className="text-purple-400" />
                 </button>
@@ -216,7 +216,7 @@ export default function PortfolioPage() {
                           className="flex items-center gap-1.5 group"
                         >
                           <Lock size={14} className="text-purple-400" />
-                          <span className="text-sm text-purple-300 group-hover:text-purple-200">Unseal</span>
+                          <span className="text-sm text-purple-300 group-hover:text-purple-200">View</span>
                           <Eye size={12} className="text-purple-400" />
                         </button>
                       )}

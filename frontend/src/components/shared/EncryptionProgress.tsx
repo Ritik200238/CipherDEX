@@ -31,7 +31,7 @@ export function EncryptionProgress({ stage, visible }: EncryptionProgressProps) 
     >
       <div className="flex items-center gap-2 text-sm font-medium text-purple-300">
         <Lock size={14} />
-        FHE Encryption
+        Secure Processing
       </div>
 
       <div className="flex gap-1">

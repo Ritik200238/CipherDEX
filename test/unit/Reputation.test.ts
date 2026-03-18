@@ -66,13 +66,13 @@ describe("Reputation", function () {
     it("only callable by authorized callers", async function () {
       await expect(
         reputation.connect(unauthorized).recordTrade(userA.address, userB.address)
-      ).to.be.revertedWith("Not authorized");
+      ).to.be.revertedWithCustomError(reputation, "Unauthorized");
     });
 
     it("reverts on self-trade", async function () {
       await expect(
         reputation.connect(authorizedCaller).recordTrade(userA.address, userA.address)
-      ).to.be.revertedWith("Self-trade");
+      ).to.be.revertedWithCustomError(reputation, "InvalidInput");
     });
 
     it("accumulates across multiple trades", async function () {
@@ -99,14 +99,14 @@ describe("Reputation", function () {
       const encRating = await encryptUint8(userA, 3n);
       await expect(
         reputation.connect(userA).submitRating(userA.address, encRating, 1)
-      ).to.be.revertedWith("Cannot rate self");
+      ).to.be.revertedWithCustomError(reputation, "InvalidInput");
     });
 
     it("prevents rating zero address", async function () {
       const encRating = await encryptUint8(userA, 3n);
       await expect(
         reputation.connect(userA).submitRating(hre.ethers.ZeroAddress, encRating, 1)
-      ).to.be.revertedWith("Zero address");
+      ).to.be.revertedWithCustomError(reputation, "InvalidInput");
     });
 
     it("prevents double-rating for same trade", async function () {
@@ -116,7 +116,7 @@ describe("Reputation", function () {
       const encRating2 = await encryptUint8(userA, 5n);
       await expect(
         reputation.connect(userA).submitRating(userB.address, encRating2, 1)
-      ).to.be.revertedWith("Already rated");
+      ).to.be.revertedWithCustomError(reputation, "InvalidState");
     });
 
     it("allows rating same user for different trades", async function () {
@@ -162,7 +162,7 @@ describe("Reputation", function () {
     it("reverts if no trades recorded", async function () {
       await expect(
         reputation.connect(userA).computeMyReputation()
-      ).to.be.revertedWith("No trades");
+      ).to.be.revertedWithCustomError(reputation, "InvalidState");
     });
   });
 
@@ -180,7 +180,7 @@ describe("Reputation", function () {
     it("addAuthorizedCaller() reverts for non-admin", async function () {
       await expect(
         reputation.connect(userA).addAuthorizedCaller(unauthorized.address)
-      ).to.be.revertedWith("Not admin");
+      ).to.be.revertedWithCustomError(reputation, "Unauthorized");
     });
 
     it("removeAuthorizedCaller() works for admin", async function () {
@@ -196,13 +196,13 @@ describe("Reputation", function () {
     it("removeAuthorizedCaller() reverts for non-admin", async function () {
       await expect(
         reputation.connect(userA).removeAuthorizedCaller(authorizedCaller.address)
-      ).to.be.revertedWith("Not admin");
+      ).to.be.revertedWithCustomError(reputation, "Unauthorized");
     });
 
     it("addAuthorizedCaller() reverts for zero address", async function () {
       await expect(
         reputation.connect(admin).addAuthorizedCaller(hre.ethers.ZeroAddress)
-      ).to.be.revertedWith("Zero address");
+      ).to.be.revertedWithCustomError(reputation, "InvalidInput");
     });
   });
 });

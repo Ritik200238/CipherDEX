@@ -39,6 +39,15 @@ export function useUnseal() {
       try {
         const { cofhejs } = await import("cofhejs/web");
 
+        // Ensure permit exists before unsealing
+        const permitResult = await cofhejs.createPermit({
+          type: "self",
+          issuer: account,
+        });
+        if (permitResult.error) {
+          throw new Error("Permit creation failed: " + String(permitResult.error));
+        }
+
         const result = await cofhejs.unseal(ctHash, fheType, account);
 
         if (result.error) {

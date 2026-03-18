@@ -94,6 +94,22 @@ export function CofheProvider({ children }: { children: React.ReactNode }) {
     }
   }, [account]);
 
+  // Auto-rotate permit every 23 hours (permits last 24h)
+  useEffect(() => {
+    if (!initialized || !account) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const { cofhejs } = await import("cofhejs/web");
+        await cofhejs.createPermit({ type: "self", issuer: account });
+      } catch {
+        // Permit refresh failed — will retry on next interval or next unseal
+      }
+    }, 23 * 60 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [initialized, account]);
+
   const value = useMemo<CofheContextValue>(
     () => ({
       initialized,

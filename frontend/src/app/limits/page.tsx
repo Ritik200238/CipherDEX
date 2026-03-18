@@ -228,7 +228,7 @@ export default function LimitsPage() {
                         ) : (
                           <>
                             <Lock size={12} className="text-purple-400" />
-                            <span className="text-purple-300 text-xs">Click to unseal</span>
+                            <span className="text-purple-300 text-xs">Click to view</span>
                             <Eye size={12} className="text-purple-400" />
                           </>
                         )}

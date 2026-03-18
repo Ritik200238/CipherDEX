@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeftRight,
@@ -35,7 +35,6 @@ interface OrderData {
   tokenSell: string;
   tokenBuy: string;
   amountSell: string;
-  encPriceHash: bigint;
   side: number; // 0 = BUY, 1 = SELL
   status: number; // 0 = ACTIVE, 1 = FILLED, 2 = CANCELLED
   createdAt: number;
@@ -136,6 +135,9 @@ export default function TradePage() {
   const orderBookContract = useContract("OrderBook");
   const orderBookRead = useReadContract("OrderBook");
 
+  /* ---- Private ref for ciphertext handles (not exposed in React state/DevTools) ---- */
+  const encHandlesRef = useRef<Map<number, bigint>>(new Map());
+
   /* ---- State ---- */
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -176,13 +178,15 @@ export default function TradePage() {
       for (let i = 0; i < num; i++) {
         const orderId = await orderBookRead.getActiveOrderId(i);
         const o = await orderBookRead.getOrder(orderId);
+        const id = Number(orderId);
+        // Store ciphertext handle in ref (not React state) to avoid DevTools exposure
+        encHandlesRef.current.set(id, BigInt(o[4]));
         fetched.push({
-          id: Number(orderId),
+          id,
           maker: o[0],
           tokenSell: o[1],
           tokenBuy: o[2],
           amountSell: o[3].toString(),
-          encPriceHash: BigInt(o[4]),
           side: Number(o[5]),
           status: Number(o[6]),
           createdAt: Number(o[7]),
@@ -209,8 +213,10 @@ export default function TradePage() {
   const unsealPrice = useCallback(
     async (order: OrderData) => {
       if (!account || order.maker.toLowerCase() !== account.toLowerCase()) return;
+      const ctHash = encHandlesRef.current.get(order.id);
+      if (ctHash === undefined) return;
       // FheTypes.Uint128 = 5
-      const value = await unseal(order.encPriceHash, 5);
+      const value = await unseal(ctHash, 5);
       if (value !== null) {
         setOrders((prev) =>
           prev.map((o) =>
@@ -484,55 +490,25 @@ export default function TradePage() {
                             {order.amountSell}
                           </td>
                           <td className="px-5 py-3.5 text-right">
-                            {mine ? (
-                              order.unsealedPrice !== null ? (
-                                <span className="font-mono text-purple-300">
-                                  {order.unsealedPrice}
-                                </span>
-                              ) : (
-                                <button
-                                  onClick={() => unsealPrice(order)}
-                                  disabled={unsealing || !initialized}
-                                  className="inline-flex items-center gap-1.5 text-xs text-purple-400
-                                             hover:text-purple-300 transition-colors disabled:opacity-50"
-                                >
-                                  <Eye size={12} />
-                                  Reveal
-                                </button>
-                              )
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 text-gray-500 text-xs">
-                                <Lock size={11} className="text-purple-500/60" />
-                                Encrypted
-                              </span>
-                            )}
+                            <span className="inline-flex items-center gap-1.5 text-gray-500 text-xs">
+                              <Lock size={11} className="text-purple-500/60" />
+                              Encrypted
+                            </span>
                           </td>
                           <td className="px-5 py-3.5 text-center">
-                            {mine ? (
-                              <button
-                                onClick={() => handleCancelOrder(order.id)}
-                                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium
-                                           bg-red-500/10 border border-red-500/20 text-red-400
-                                           hover:bg-red-500/20 hover:border-red-500/30 transition-all"
-                              >
-                                <Trash2 size={12} />
-                                Cancel
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  setSelectedOrder(order);
-                                  setTakerPrice("");
-                                  setModalView("fill");
-                                }}
-                                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium
-                                           bg-purple-500/10 border border-purple-500/20 text-purple-300
-                                           hover:bg-purple-500/20 hover:border-purple-500/30 transition-all"
-                              >
-                                <ShoppingCart size={12} />
-                                Fill Order
-                              </button>
-                            )}
+                            <button
+                              onClick={() => {
+                                setSelectedOrder(order);
+                                setTakerPrice("");
+                                setModalView("fill");
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium
+                                         bg-purple-500/10 border border-purple-500/20 text-purple-300
+                                         hover:bg-purple-500/20 hover:border-purple-500/30 transition-all"
+                            >
+                              <ShoppingCart size={12} />
+                              Fill Order
+                            </button>
                           </td>
                         </motion.tr>
                       );
@@ -545,7 +521,7 @@ export default function TradePage() {
             {/* Footer note */}
             <div className="px-5 py-3 border-t border-purple-500/5 flex items-center gap-2 text-[11px] text-gray-600">
               <Lock size={10} className="text-purple-500/40" />
-              All prices are encrypted on-chain via FHE. Only order owners can unseal their own price.
+              All prices are encrypted on-chain via FHE. Only order owners can view their own price.
             </div>
           </div>
 
@@ -654,17 +630,17 @@ export default function TradePage() {
               {encrypting ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
-                  Encrypting...
+                  Processing...
                 </>
               ) : txState === "signing" ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
-                  Sign in wallet...
+                  Processing...
                 </>
               ) : txState === "confirming" ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
-                  Confirming...
+                  Processing...
                 </>
               ) : (
                 <>
@@ -703,7 +679,7 @@ export default function TradePage() {
                   <th className="text-left px-5 py-3 font-medium">Side</th>
                   <th className="text-right px-5 py-3 font-medium">Amount</th>
                   <th className="text-right px-5 py-3 font-medium">
-                    Price (Unsealed)
+                    Price
                   </th>
                   <th className="text-center px-5 py-3 font-medium">Action</th>
                 </tr>
@@ -749,7 +725,7 @@ export default function TradePage() {
                                        hover:text-purple-300 transition-colors disabled:opacity-50"
                           >
                             <Eye size={12} />
-                            Unseal
+                            View Price
                           </button>
                         )}
                       </td>
@@ -892,12 +868,12 @@ export default function TradePage() {
                 {encrypting ? (
                   <>
                     <Loader2 size={14} className="animate-spin" />
-                    Encrypting...
+                    Processing...
                   </>
                 ) : txState === "signing" ? (
                   <>
                     <Loader2 size={14} className="animate-spin" />
-                    Sign in wallet...
+                    Processing...
                   </>
                 ) : (
                   <>

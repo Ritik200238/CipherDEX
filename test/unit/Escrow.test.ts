@@ -111,7 +111,7 @@ describe("Escrow", function () {
           futureDeadline,
           dealHash
         )
-      ).to.be.revertedWith("Invalid partyB");
+      ).to.be.revertedWithCustomError(escrow, "InvalidInput");
     });
 
     it("reverts if partyB is self", async function () {
@@ -132,7 +132,7 @@ describe("Escrow", function () {
           futureDeadline,
           dealHash
         )
-      ).to.be.revertedWith("Invalid partyB");
+      ).to.be.revertedWithCustomError(escrow, "InvalidInput");
     });
 
     it("reverts if same token", async function () {
@@ -152,7 +152,7 @@ describe("Escrow", function () {
           futureDeadline,
           dealHash
         )
-      ).to.be.revertedWith("Same token");
+      ).to.be.revertedWithCustomError(escrow, "InvalidInput");
     });
 
     it("reverts if deadline already passed", async function () {
@@ -173,7 +173,7 @@ describe("Escrow", function () {
           pastDeadline,
           dealHash
         )
-      ).to.be.revertedWith("Deadline passed");
+      ).to.be.revertedWithCustomError(escrow, "Expired");
     });
   });
 
@@ -227,14 +227,14 @@ describe("Escrow", function () {
       const encAmountB = await encryptUint128(partyB, 2000n);
       await expect(
         escrow.connect(partyB).fundDeal(0, encAmountB)
-      ).to.be.revertedWith("PartyA must fund first");
+      ).to.be.revertedWithCustomError(escrow, "InvalidState");
     });
 
     it("outsider cannot fund", async function () {
       const encAmount = await encryptUint128(outsider, 1000n);
       await expect(
         escrow.connect(outsider).fundDeal(0, encAmount)
-      ).to.be.revertedWith("Not a party");
+      ).to.be.revertedWithCustomError(escrow, "Unauthorized");
     });
   });
 
@@ -287,7 +287,7 @@ describe("Escrow", function () {
 
       await expect(
         escrow.connect(partyA).releaseDeal(0)
-      ).to.be.revertedWith("Not fully funded");
+      ).to.be.revertedWithCustomError(escrow, "InvalidState");
     });
   });
 
@@ -360,7 +360,7 @@ describe("Escrow", function () {
 
       await expect(
         escrow.connect(partyA).cancelDeal(0)
-      ).to.be.revertedWith("Deadline not passed");
+      ).to.be.revertedWithCustomError(escrow, "InvalidState");
     });
 
     it("reverts if not a party", async function () {
@@ -378,7 +378,7 @@ describe("Escrow", function () {
 
       await expect(
         escrow.connect(outsider).cancelDeal(0)
-      ).to.be.revertedWith("Not a party");
+      ).to.be.revertedWithCustomError(escrow, "Unauthorized");
     });
   });
 });

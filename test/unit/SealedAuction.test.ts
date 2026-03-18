@@ -84,7 +84,7 @@ describe("SealedAuction", function () {
       const tokenAddr = await token.getAddress();
       await expect(
         auction.connect(seller).createAuction(tokenAddr, tokenAddr, 1000, 600, 0)
-      ).to.be.revertedWith("Same token");
+      ).to.be.revertedWithCustomError(auction, "InvalidInput");
     });
 
     it("reverts if zero amount", async function () {
@@ -92,7 +92,7 @@ describe("SealedAuction", function () {
       const paymentAddr = await paymentToken.getAddress();
       await expect(
         auction.connect(seller).createAuction(tokenAddr, paymentAddr, 0, 600, 0)
-      ).to.be.revertedWith("Zero amount");
+      ).to.be.revertedWithCustomError(auction, "InvalidInput");
     });
 
     it("reverts if duration too short", async function () {
@@ -100,7 +100,7 @@ describe("SealedAuction", function () {
       const paymentAddr = await paymentToken.getAddress();
       await expect(
         auction.connect(seller).createAuction(tokenAddr, paymentAddr, 1000, 100, 0)
-      ).to.be.revertedWith("Duration too short");
+      ).to.be.revertedWithCustomError(auction, "InvalidInput");
     });
 
     it("uses default snipe extension when 0 is passed", async function () {
@@ -143,14 +143,14 @@ describe("SealedAuction", function () {
       const encBid2 = await encryptUint128(bidder1, 6000n);
       await expect(
         auction.connect(bidder1).bid(0, encBid2)
-      ).to.be.revertedWith("Already bid");
+      ).to.be.revertedWithCustomError(auction, "InvalidState");
     });
 
     it("prevents seller from bidding", async function () {
       const encBid = await encryptUint128(seller, 5000n);
       await expect(
         auction.connect(seller).bid(0, encBid)
-      ).to.be.revertedWith("Seller cannot bid");
+      ).to.be.revertedWithCustomError(auction, "InvalidInput");
     });
 
     it("increments bid count for multiple bidders", async function () {
@@ -207,7 +207,7 @@ describe("SealedAuction", function () {
       // Try to close before deadline
       await expect(
         auction.connect(seller).closeAuction(0)
-      ).to.be.revertedWith("Auction still active");
+      ).to.be.revertedWithCustomError(auction, "InvalidState");
     });
 
     it("requires bids exist", async function () {
@@ -217,7 +217,7 @@ describe("SealedAuction", function () {
 
       await expect(
         auction.connect(seller).closeAuction(0)
-      ).to.be.revertedWith("No bids");
+      ).to.be.revertedWithCustomError(auction, "InvalidState");
     });
 
     it("succeeds when deadline passed and bids exist", async function () {
@@ -245,7 +245,7 @@ describe("SealedAuction", function () {
 
       await expect(
         auction.connect(bidder1).closeAuction(0)
-      ).to.be.revertedWith("Not seller");
+      ).to.be.revertedWithCustomError(auction, "Unauthorized");
     });
   });
 
@@ -273,7 +273,7 @@ describe("SealedAuction", function () {
 
       await expect(
         auction.connect(seller).cancelAuction(0)
-      ).to.be.revertedWith("Has bids");
+      ).to.be.revertedWithCustomError(auction, "InvalidState");
     });
 
     it("reverts if not seller", async function () {
@@ -283,7 +283,7 @@ describe("SealedAuction", function () {
 
       await expect(
         auction.connect(bidder1).cancelAuction(0)
-      ).to.be.revertedWith("Not seller");
+      ).to.be.revertedWithCustomError(auction, "Unauthorized");
     });
   });
 });

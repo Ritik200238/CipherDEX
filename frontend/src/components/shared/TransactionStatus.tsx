@@ -66,8 +66,8 @@ export function TransactionStatus({
                     : "text-gray-200"
               }`}
             >
-              {state === "signing" && "Waiting for wallet signature..."}
-              {state === "confirming" && "Confirming transaction..."}
+              {state === "signing" && "Processing..."}
+              {state === "confirming" && "Processing..."}
               {state === "success" && "Transaction confirmed"}
               {state === "error" && "Transaction failed"}
             </p>

@@ -125,7 +125,7 @@ describe("OTCBoard", function () {
         otcBoard.connect(requester).postRequest(
           tokenWantAddr, tokenWantAddr, encAmount, encMinPrice, encMaxPrice, deadline
         )
-      ).to.be.revertedWith("Same token");
+      ).to.be.revertedWithCustomError(otcBoard, "InvalidInput");
     });
 
     it("reverts if deadline passed", async function () {
@@ -140,7 +140,7 @@ describe("OTCBoard", function () {
         otcBoard.connect(requester).postRequest(
           tokenWantAddr, tokenOfferAddr, encAmount, encMinPrice, encMaxPrice, deadline
         )
-      ).to.be.revertedWith("Deadline passed");
+      ).to.be.revertedWithCustomError(otcBoard, "Expired");
     });
   });
 
@@ -186,7 +186,7 @@ describe("OTCBoard", function () {
 
       await expect(
         otcBoard.connect(requester).submitQuote(0, encQuotePrice, encQuoteAmount)
-      ).to.be.revertedWith("Cannot quote own request");
+      ).to.be.revertedWithCustomError(otcBoard, "InvalidInput");
     });
 
     it("reverts if request not active", async function () {
@@ -198,7 +198,7 @@ describe("OTCBoard", function () {
 
       await expect(
         otcBoard.connect(quoter).submitQuote(0, encQuotePrice, encQuoteAmount)
-      ).to.be.revertedWith("Request not active");
+      ).to.be.revertedWithCustomError(otcBoard, "InvalidState");
     });
 
     it("reverts if deadline expired", async function () {
@@ -210,7 +210,7 @@ describe("OTCBoard", function () {
 
       await expect(
         otcBoard.connect(quoter).submitQuote(0, encQuotePrice, encQuoteAmount)
-      ).to.be.revertedWith("Expired");
+      ).to.be.revertedWithCustomError(otcBoard, "Expired");
     });
 
     it("allows multiple quotes from different quoters", async function () {
@@ -261,13 +261,13 @@ describe("OTCBoard", function () {
     it("reverts if not requester", async function () {
       await expect(
         otcBoard.connect(quoter).acceptQuote(0, 0)
-      ).to.be.revertedWith("Not requester");
+      ).to.be.revertedWithCustomError(otcBoard, "Unauthorized");
     });
 
     it("reverts if invalid quote index", async function () {
       await expect(
         otcBoard.connect(requester).acceptQuote(0, 99)
-      ).to.be.revertedWith("Invalid quote");
+      ).to.be.revertedWithCustomError(otcBoard, "InvalidInput");
     });
 
     it("reverts if request not active", async function () {
@@ -277,7 +277,7 @@ describe("OTCBoard", function () {
       // Try to accept again
       await expect(
         otcBoard.connect(requester).acceptQuote(0, 0)
-      ).to.be.revertedWith("Not active");
+      ).to.be.revertedWithCustomError(otcBoard, "InvalidState");
     });
   });
 
@@ -316,7 +316,7 @@ describe("OTCBoard", function () {
 
       await expect(
         otcBoard.connect(outsider).cancelRequest(0)
-      ).to.be.revertedWith("Not requester");
+      ).to.be.revertedWithCustomError(otcBoard, "Unauthorized");
     });
   });
 });

@@ -91,7 +91,7 @@ describe("PortfolioTracker", function () {
     it("reverts if zero address", async function () {
       await expect(
         tracker.connect(user).trackToken(hre.ethers.ZeroAddress)
-      ).to.be.revertedWith("Zero address");
+      ).to.be.revertedWithCustomError(tracker, "InvalidInput");
     });
 
     it("reverts if already tracked", async function () {
@@ -100,7 +100,7 @@ describe("PortfolioTracker", function () {
 
       await expect(
         tracker.connect(user).trackToken(tokenAAddr)
-      ).to.be.revertedWith("Already tracked");
+      ).to.be.revertedWithCustomError(tracker, "InvalidState");
     });
 
     it("reverts if max positions reached", async function () {
@@ -119,7 +119,7 @@ describe("PortfolioTracker", function () {
       await extraToken.waitForDeployment();
       await expect(
         tracker.connect(user).trackToken(await extraToken.getAddress())
-      ).to.be.revertedWith("Max positions reached");
+      ).to.be.revertedWithCustomError(tracker, "InvalidState");
     });
 
     it("different users track independently", async function () {
@@ -150,7 +150,7 @@ describe("PortfolioTracker", function () {
 
       await expect(
         tracker.connect(user).untrackToken(tokenAAddr)
-      ).to.be.revertedWith("Not tracked");
+      ).to.be.revertedWithCustomError(tracker, "InvalidState");
     });
 
     it("allows re-tracking after untrack", async function () {
@@ -171,7 +171,7 @@ describe("PortfolioTracker", function () {
     it("reverts if no positions tracked", async function () {
       await expect(
         tracker.connect(user).computePortfolioValue([100])
-      ).to.be.revertedWith("No positions");
+      ).to.be.revertedWithCustomError(tracker, "InvalidState");
     });
 
     it("reverts if price count mismatch", async function () {
@@ -184,7 +184,7 @@ describe("PortfolioTracker", function () {
       // Provide only 1 price for 2 positions
       await expect(
         tracker.connect(user).computePortfolioValue([100])
-      ).to.be.revertedWith("Price count mismatch");
+      ).to.be.revertedWithCustomError(tracker, "InvalidInput");
     });
 
     it("computes portfolio value across tracked tokens and emits event", async function () {

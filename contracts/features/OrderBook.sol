@@ -35,6 +35,11 @@ contract OrderBook is ReentrancyGuard, FHEConstants {
     // Track active order IDs per token pair for frontend querying
     uint256[] public activeOrderIds;
 
+    error Unauthorized();
+    error InvalidInput();
+    error InvalidState();
+    error Paused();
+
     event OrderCreated(
         uint256 indexed orderId,
         address indexed maker,
@@ -45,15 +50,15 @@ contract OrderBook is ReentrancyGuard, FHEConstants {
     );
     event OrderFilled(uint256 indexed orderId, address indexed taker);
     event OrderCancelled(uint256 indexed orderId);
-    event TradeCompleted(address indexed partyA, address indexed partyB, uint256 orderId);
+    event TradeCompleted(bytes32 indexed partyAHash, bytes32 indexed partyBHash, uint256 orderId);
 
     modifier whenNotPaused() {
-        require(!registry.paused(), "Platform paused");
+        if (registry.paused()) revert Paused();
         _;
     }
 
     constructor(address _vault, address _registry) {
-        require(_vault != address(0) && _registry != address(0), "Zero address");
+        if (_vault == address(0) || _registry == address(0)) revert InvalidInput();
         vault = ISettlementVault(_vault);
         registry = IPlatformRegistry(_registry);
         _initFHEConstants();
@@ -73,8 +78,8 @@ contract OrderBook is ReentrancyGuard, FHEConstants {
         InEuint128 calldata encPrice,
         OrderSide side
     ) external whenNotPaused returns (uint256 orderId) {
-        require(tokenSell != tokenBuy, "Same token");
-        require(amountSell > 0, "Zero amount");
+        if (tokenSell == tokenBuy) revert InvalidInput();
+        if (amountSell == 0) revert InvalidInput();
 
         orderId = nextOrderId++;
         euint128 price = FHE.asEuint128(encPrice);
@@ -110,8 +115,8 @@ contract OrderBook is ReentrancyGuard, FHEConstants {
         InEuint128 calldata encTakerPrice
     ) external whenNotPaused nonReentrant {
         Order storage order = orders[orderId];
-        require(order.status == OrderStatus.ACTIVE, "Order not active");
-        require(order.maker != msg.sender, "Cannot fill own order");
+        if (order.status != OrderStatus.ACTIVE) revert InvalidState();
+        if (order.maker == msg.sender) revert InvalidInput();
 
         euint128 takerPrice = FHE.asEuint128(encTakerPrice);
 
@@ -147,16 +152,21 @@ contract OrderBook is ReentrancyGuard, FHEConstants {
         // Remove from active list
         _removeFromActive(orderId);
 
-        // Emit trade event for reputation system (non-blocking)
-        emit TradeCompleted(order.maker, msg.sender, orderId);
+        // Emit trade event with hashed addresses for privacy
+        bytes32 salt = keccak256(abi.encodePacked(block.number, block.prevrandao));
+        emit TradeCompleted(
+            keccak256(abi.encodePacked(order.maker, salt)),
+            keccak256(abi.encodePacked(msg.sender, salt)),
+            orderId
+        );
         emit OrderFilled(orderId, msg.sender);
     }
 
     /// @notice Cancel an unfilled order (maker only)
     function cancelOrder(uint256 orderId) external {
         Order storage order = orders[orderId];
-        require(order.maker == msg.sender, "Not order maker");
-        require(order.status == OrderStatus.ACTIVE, "Order not active");
+        if (order.maker != msg.sender) revert Unauthorized();
+        if (order.status != OrderStatus.ACTIVE) revert InvalidState();
 
         order.status = OrderStatus.CANCELLED;
         _removeFromActive(orderId);
@@ -184,14 +194,14 @@ contract OrderBook is ReentrancyGuard, FHEConstants {
         return nextOrderId;
     }
 
-    /// @notice Get count of currently active orders
-    function getActiveOrderCount() external view returns (uint256) {
-        return activeOrderIds.length;
+    /// @notice Check if there are any active orders
+    function hasActiveOrders() external view returns (bool) {
+        return activeOrderIds.length > 0;
     }
 
     /// @notice Get active order ID at index
     function getActiveOrderId(uint256 index) external view returns (uint256) {
-        require(index < activeOrderIds.length, "Index out of bounds");
+        if (index >= activeOrderIds.length) revert InvalidInput();
         return activeOrderIds[index];
     }
 

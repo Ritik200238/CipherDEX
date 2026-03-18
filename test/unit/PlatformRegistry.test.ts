@@ -53,14 +53,14 @@ describe("PlatformRegistry", function () {
       const factory = await hre.ethers.getContractFactory("PlatformRegistry");
       await expect(
         factory.deploy(admin.address, 1001, feeCollector.address)
-      ).to.be.revertedWith("Fee too high");
+      ).to.be.revertedWithCustomError(registry, "InvalidInput");
     });
 
     it("reverts if feeCollector is zero address", async function () {
       const factory = await hre.ethers.getContractFactory("PlatformRegistry");
       await expect(
         factory.deploy(admin.address, DEFAULT_FEE_BPS, hre.ethers.ZeroAddress)
-      ).to.be.revertedWith("Zero fee collector");
+      ).to.be.revertedWithCustomError(registry, "InvalidInput");
     });
   });
 
@@ -100,7 +100,7 @@ describe("PlatformRegistry", function () {
       await registry.connect(alice).register();
       await expect(
         registry.connect(alice).register()
-      ).to.be.revertedWith("Already registered");
+      ).to.be.revertedWithCustomError(registry, "InvalidState");
     });
 
     it("register() reverts when paused", async function () {
@@ -136,14 +136,14 @@ describe("PlatformRegistry", function () {
     it("suspendUser() reverts for unregistered user", async function () {
       await expect(
         registry.connect(admin).suspendUser(bob.address)
-      ).to.be.revertedWith("Not registered");
+      ).to.be.revertedWithCustomError(registry, "InvalidState");
     });
 
     it("suspendUser() reverts if already suspended", async function () {
       await registry.connect(admin).suspendUser(alice.address);
       await expect(
         registry.connect(admin).suspendUser(alice.address)
-      ).to.be.revertedWith("Already suspended");
+      ).to.be.revertedWithCustomError(registry, "InvalidState");
     });
 
     it("suspendUser() reverts when called by non-owner", async function () {
@@ -169,7 +169,7 @@ describe("PlatformRegistry", function () {
     it("reinstateUser() reverts if not suspended", async function () {
       await expect(
         registry.connect(admin).reinstateUser(alice.address)
-      ).to.be.revertedWith("Not suspended");
+      ).to.be.revertedWithCustomError(registry, "InvalidState");
     });
 
     it("reinstateUser() reverts when called by non-owner", async function () {
@@ -196,14 +196,14 @@ describe("PlatformRegistry", function () {
     it("registerContract() reverts for zero address", async function () {
       await expect(
         registry.connect(admin).registerContract(hre.ethers.ZeroAddress)
-      ).to.be.revertedWith("Zero address");
+      ).to.be.revertedWithCustomError(registry, "InvalidInput");
     });
 
     it("registerContract() reverts if already registered", async function () {
       await registry.connect(admin).registerContract(alice.address);
       await expect(
         registry.connect(admin).registerContract(alice.address)
-      ).to.be.revertedWith("Already registered");
+      ).to.be.revertedWithCustomError(registry, "InvalidState");
     });
 
     it("registerContract() reverts when called by non-owner", async function () {
@@ -229,7 +229,7 @@ describe("PlatformRegistry", function () {
     it("deregisterContract() reverts if not registered", async function () {
       await expect(
         registry.connect(admin).deregisterContract(alice.address)
-      ).to.be.revertedWith("Not registered");
+      ).to.be.revertedWithCustomError(registry, "InvalidState");
     });
 
     it("deregisterContract() reverts when called by non-owner", async function () {
@@ -265,7 +265,7 @@ describe("PlatformRegistry", function () {
     it("setFeeBasisPoints() reverts above 1000", async function () {
       await expect(
         registry.connect(admin).setFeeBasisPoints(1001)
-      ).to.be.revertedWith("Fee too high");
+      ).to.be.revertedWithCustomError(registry, "InvalidInput");
     });
 
     it("setFeeBasisPoints() reverts when called by non-owner", async function () {
@@ -288,7 +288,7 @@ describe("PlatformRegistry", function () {
     it("setFeeCollector() reverts for zero address", async function () {
       await expect(
         registry.connect(admin).setFeeCollector(hre.ethers.ZeroAddress)
-      ).to.be.revertedWith("Zero address");
+      ).to.be.revertedWithCustomError(registry, "InvalidInput");
     });
 
     it("setFeeCollector() reverts when called by non-owner", async function () {

@@ -3,7 +3,7 @@
  * Addresses are placeholders until deployment — update them after `npx hardhat deploy`.
  */
 
-export const DEPLOY_NETWORK = {
+export const FHENIX_TESTNET = {
   chainId: 11155111,
   chainIdHex: "0xaa36a7",
   name: "Ethereum Sepolia",
@@ -29,7 +29,7 @@ export const CONTRACTS = {
   PortfolioTracker: "0xBeE4D40bFb9Fcab8CB800b29713ef8fC9b2f5FcA",
   Reputation: "0xDBA2b69d6688dA2c9aDb637F18E06Af40a560D05",
   OTCBoard: "0xC312FbFA6AE09E5d7d19809D8ED3386b0e0750f8",
-} as const;
+} satisfies Record<string, string>;
 
 export type ContractName = keyof typeof CONTRACTS;
 
@@ -56,12 +56,12 @@ export const NAV_ITEMS = [
 
 /** Encryption stage labels for progress display */
 export const ENCRYPT_STAGES = [
-  { key: "extract", label: "Extracting values" },
-  { key: "pack", label: "Packing inputs" },
-  { key: "prove", label: "Generating proof" },
-  { key: "verify", label: "Verifying proof" },
-  { key: "replace", label: "Replacing handles" },
-  { key: "done", label: "Encryption complete" },
+  { key: "extract", label: "Processing" },
+  { key: "pack", label: "Processing" },
+  { key: "prove", label: "Processing" },
+  { key: "verify", label: "Processing" },
+  { key: "replace", label: "Processing" },
+  { key: "done", label: "Complete" },
 ] as const;
 
 /** Polling / timeout config for async FHE operations */

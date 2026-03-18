@@ -37,21 +37,26 @@ contract SettlementVault is Ownable2Step, ReentrancyGuard, FHEConstants {
     event TokenWhitelisted(address indexed token);
     event TokenDelisted(address indexed token);
 
+    error Unauthorized();
+    error InvalidInput();
+    error InvalidState();
+    error Paused();
+
     modifier whenNotPaused() {
-        require(!registry.paused(), "Platform paused");
+        if (registry.paused()) revert Paused();
         _;
     }
 
     modifier onlyAuthorizedSettler() {
-        require(authorizedSettlers[msg.sender], "Not authorized settler");
+        if (!authorizedSettlers[msg.sender]) revert Unauthorized();
         _;
     }
 
     constructor(address _token, address _registry, address _admin)
         Ownable(_admin)
     {
-        require(_token != address(0), "Zero token");
-        require(_registry != address(0), "Zero registry");
+        if (_token == address(0)) revert InvalidInput();
+        if (_registry == address(0)) revert InvalidInput();
         registry = IPlatformRegistry(_registry);
         supportedTokens[_token] = true;
         _initFHEConstants();
@@ -68,7 +73,7 @@ contract SettlementVault is Ownable2Step, ReentrancyGuard, FHEConstants {
         whenNotPaused
         nonReentrant
     {
-        require(supportedTokens[token], "Token not supported");
+        if (!supportedTokens[token]) revert InvalidInput();
         euint64 amount = FHE.asEuint64(encAmount);
 
         // Transfer FHERC20 from user to vault
@@ -92,7 +97,7 @@ contract SettlementVault is Ownable2Step, ReentrancyGuard, FHEConstants {
         whenNotPaused
         nonReentrant
     {
-        require(supportedTokens[token], "Token not supported");
+        if (!supportedTokens[token]) revert InvalidInput();
         euint64 amount = FHE.asEuint64(encAmount);
 
         // Zero-replacement: withdraw 0 if insufficient balance (never revert)
@@ -132,9 +137,9 @@ contract SettlementVault is Ownable2Step, ReentrancyGuard, FHEConstants {
         address token,
         euint64 amount
     ) external onlyAuthorizedSettler nonReentrant {
-        require(supportedTokens[token], "Token not supported");
-        require(from != to, "Self-settlement");
-        require(from != address(0) && to != address(0), "Zero address");
+        if (!supportedTokens[token]) revert InvalidInput();
+        if (from == to) revert InvalidInput();
+        if (from == address(0) || to == address(0)) revert InvalidInput();
 
         // Zero-replacement: transfer 0 if insufficient balance
         euint64 transferred = FHE.select(
@@ -160,30 +165,30 @@ contract SettlementVault is Ownable2Step, ReentrancyGuard, FHEConstants {
 
     /// @notice Authorize a feature contract to call settleTrade
     function addAuthorizedSettler(address settler) external onlyOwner {
-        require(settler != address(0), "Zero address");
-        require(!authorizedSettlers[settler], "Already authorized");
+        if (settler == address(0)) revert InvalidInput();
+        if (authorizedSettlers[settler]) revert InvalidState();
         authorizedSettlers[settler] = true;
         emit SettlerAuthorized(settler);
     }
 
     /// @notice Revoke a feature contract's settlement authorization
     function removeAuthorizedSettler(address settler) external onlyOwner {
-        require(authorizedSettlers[settler], "Not authorized");
+        if (!authorizedSettlers[settler]) revert InvalidState();
         authorizedSettlers[settler] = false;
         emit SettlerRevoked(settler);
     }
 
     /// @notice Whitelist a new FHERC20 token
     function addSupportedToken(address token) external onlyOwner {
-        require(token != address(0), "Zero address");
-        require(!supportedTokens[token], "Already supported");
+        if (token == address(0)) revert InvalidInput();
+        if (supportedTokens[token]) revert InvalidState();
         supportedTokens[token] = true;
         emit TokenWhitelisted(token);
     }
 
     /// @notice Remove a token from the whitelist
     function removeSupportedToken(address token) external onlyOwner {
-        require(supportedTokens[token], "Not supported");
+        if (!supportedTokens[token]) revert InvalidState();
         supportedTokens[token] = false;
         emit TokenDelisted(token);
     }

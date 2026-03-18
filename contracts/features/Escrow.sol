@@ -36,19 +36,25 @@ contract Escrow is ReentrancyGuard, FHEConstants {
     mapping(uint256 => Deal) public deals;
     uint256 public nextDealId;
 
+    error Unauthorized();
+    error InvalidInput();
+    error InvalidState();
+    error Expired();
+    error Paused();
+
     event DealCreated(uint256 indexed dealId, address indexed partyA, address indexed partyB, uint256 deadline);
     event DealFunded(uint256 indexed dealId, address indexed party);
     event DealReleased(uint256 indexed dealId);
     event DealCancelled(uint256 indexed dealId);
-    event TradeCompleted(address indexed partyA, address indexed partyB, uint256 dealId);
+    event TradeCompleted(bytes32 indexed partyAHash, bytes32 indexed partyBHash, uint256 dealId);
 
     modifier whenNotPaused() {
-        require(!registry.paused(), "Platform paused");
+        if (registry.paused()) revert Paused();
         _;
     }
 
     constructor(address _vault, address _registry) {
-        require(_vault != address(0) && _registry != address(0), "Zero address");
+        if (_vault == address(0) || _registry == address(0)) revert InvalidInput();
         vault = ISettlementVault(_vault);
         registry = IPlatformRegistry(_registry);
         _initFHEConstants();
@@ -71,9 +77,9 @@ contract Escrow is ReentrancyGuard, FHEConstants {
         uint256 deadline,
         bytes32 dealHash
     ) external whenNotPaused returns (uint256 dealId) {
-        require(partyB != address(0) && partyB != msg.sender, "Invalid partyB");
-        require(tokenA != tokenB, "Same token");
-        require(deadline > block.timestamp, "Deadline passed");
+        if (partyB == address(0) || partyB == msg.sender) revert InvalidInput();
+        if (tokenA == tokenB) revert InvalidInput();
+        if (deadline <= block.timestamp) revert Expired();
 
         dealId = nextDealId++;
         euint128 termsA = FHE.asEuint128(encTermsA);
@@ -116,15 +122,13 @@ contract Escrow is ReentrancyGuard, FHEConstants {
         nonReentrant
     {
         Deal storage deal = deals[dealId];
-        require(block.timestamp < deal.deadline, "Deadline passed");
+        if (block.timestamp >= deal.deadline) revert Expired();
 
         euint128 amount = FHE.asEuint128(encAmount);
 
         if (msg.sender == deal.partyA) {
-            require(
-                deal.status == DealStatus.CREATED || deal.status == DealStatus.FUNDED_A,
-                "Invalid state for A"
-            );
+            if (deal.status != DealStatus.CREATED && deal.status != DealStatus.FUNDED_A)
+                revert InvalidState();
             // Store deposit and verify against terms
             deal.encDepositA = amount;
             deal.matchA = FHE.eq(amount, deal.encTermsA);
@@ -132,15 +136,13 @@ contract Escrow is ReentrancyGuard, FHEConstants {
             FHE.allowThis(deal.encDepositA);
             FHE.allowThis(deal.matchA);
             FHE.allow(deal.encDepositA, msg.sender);
+            FHE.allow(deal.encDepositA, deal.partyB);  // B can verify A's deposit
 
             if (deal.status == DealStatus.CREATED) {
                 deal.status = DealStatus.FUNDED_A;
             }
         } else if (msg.sender == deal.partyB) {
-            require(
-                deal.status == DealStatus.FUNDED_A,
-                "PartyA must fund first"
-            );
+            if (deal.status != DealStatus.FUNDED_A) revert InvalidState();
             // Store deposit and verify against terms
             deal.encDepositB = amount;
             deal.matchB = FHE.eq(amount, deal.encTermsB);
@@ -148,10 +150,11 @@ contract Escrow is ReentrancyGuard, FHEConstants {
             FHE.allowThis(deal.encDepositB);
             FHE.allowThis(deal.matchB);
             FHE.allow(deal.encDepositB, msg.sender);
+            FHE.allow(deal.encDepositB, deal.partyA);  // A can verify B's deposit
 
             deal.status = DealStatus.FUNDED_BOTH;
         } else {
-            revert("Not a party");
+            revert Unauthorized();
         }
 
         emit DealFunded(dealId, msg.sender);
@@ -162,11 +165,8 @@ contract Escrow is ReentrancyGuard, FHEConstants {
     /// @dev Both branches always execute (constant-time, no timing leak)
     function releaseDeal(uint256 dealId) external nonReentrant {
         Deal storage deal = deals[dealId];
-        require(deal.status == DealStatus.FUNDED_BOTH, "Not fully funded");
-        require(
-            msg.sender == deal.partyA || msg.sender == deal.partyB,
-            "Not a party"
-        );
+        if (deal.status != DealStatus.FUNDED_BOTH) revert InvalidState();
+        if (msg.sender != deal.partyA && msg.sender != deal.partyB) revert Unauthorized();
 
         // Verify both deposits match their respective terms
         ebool bothMatch = FHE.and(deal.matchA, deal.matchB);
@@ -191,27 +191,27 @@ contract Escrow is ReentrancyGuard, FHEConstants {
 
         deal.status = DealStatus.RELEASED;
 
-        emit TradeCompleted(deal.partyA, deal.partyB, dealId);
+        bytes32 salt = keccak256(abi.encodePacked(block.number, block.prevrandao));
+        emit TradeCompleted(
+            keccak256(abi.encodePacked(deal.partyA, salt)),
+            keccak256(abi.encodePacked(deal.partyB, salt)),
+            dealId
+        );
         emit DealReleased(dealId);
     }
 
     /// @notice Cancel and refund if deadline passed or deal not fully funded
     function cancelDeal(uint256 dealId) external nonReentrant {
         Deal storage deal = deals[dealId];
-        require(
-            deal.status == DealStatus.CREATED ||
-            deal.status == DealStatus.FUNDED_A ||
-            deal.status == DealStatus.FUNDED_BOTH,
-            "Cannot cancel"
-        );
-        require(
-            msg.sender == deal.partyA || msg.sender == deal.partyB,
-            "Not a party"
-        );
+        if (deal.status != DealStatus.CREATED &&
+            deal.status != DealStatus.FUNDED_A &&
+            deal.status != DealStatus.FUNDED_BOTH)
+            revert InvalidState();
+        if (msg.sender != deal.partyA && msg.sender != deal.partyB) revert Unauthorized();
 
         // Allow cancel if deadline passed OR if deal not fully funded
         if (deal.status == DealStatus.FUNDED_BOTH) {
-            require(block.timestamp >= deal.deadline, "Deadline not passed");
+            if (block.timestamp < deal.deadline) revert InvalidState();
         }
 
         deal.status = DealStatus.CANCELLED;

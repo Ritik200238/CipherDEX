@@ -13,7 +13,7 @@ interface DecryptionSpinnerProps {
  */
 export function DecryptionSpinner({
   visible,
-  label = "Decrypting your data...",
+  label = "Processing...",
 }: DecryptionSpinnerProps) {
   if (!visible) return null;
 

@@ -63,7 +63,7 @@ describe("SettlementVault", function () {
           await registry.getAddress(),
           admin.address
         )
-      ).to.be.revertedWith("Zero token");
+      ).to.be.revertedWithCustomError(vault, "InvalidInput");
     });
 
     it("reverts if registry address is zero", async function () {
@@ -74,7 +74,7 @@ describe("SettlementVault", function () {
           hre.ethers.ZeroAddress,
           admin.address
         )
-      ).to.be.revertedWith("Zero registry");
+      ).to.be.revertedWithCustomError(vault, "InvalidInput");
     });
 
     it("emits TokenWhitelisted on deploy", async function () {
@@ -110,14 +110,14 @@ describe("SettlementVault", function () {
     it("addSupportedToken() reverts for zero address", async function () {
       await expect(
         vault.connect(admin).addSupportedToken(hre.ethers.ZeroAddress)
-      ).to.be.revertedWith("Zero address");
+      ).to.be.revertedWithCustomError(vault, "InvalidInput");
     });
 
     it("addSupportedToken() reverts if already supported", async function () {
       await vault.connect(admin).addSupportedToken(bob.address);
       await expect(
         vault.connect(admin).addSupportedToken(bob.address)
-      ).to.be.revertedWith("Already supported");
+      ).to.be.revertedWithCustomError(vault, "InvalidState");
     });
 
     it("addSupportedToken() reverts when called by non-owner", async function () {
@@ -142,7 +142,7 @@ describe("SettlementVault", function () {
     it("removeSupportedToken() reverts if not supported", async function () {
       await expect(
         vault.connect(admin).removeSupportedToken(bob.address)
-      ).to.be.revertedWith("Not supported");
+      ).to.be.revertedWithCustomError(vault, "InvalidState");
     });
 
     it("removeSupportedToken() reverts when called by non-owner", async function () {
@@ -167,14 +167,14 @@ describe("SettlementVault", function () {
     it("addAuthorizedSettler() reverts for zero address", async function () {
       await expect(
         vault.connect(admin).addAuthorizedSettler(hre.ethers.ZeroAddress)
-      ).to.be.revertedWith("Zero address");
+      ).to.be.revertedWithCustomError(vault, "InvalidInput");
     });
 
     it("addAuthorizedSettler() reverts if already authorized", async function () {
       await vault.connect(admin).addAuthorizedSettler(settler.address);
       await expect(
         vault.connect(admin).addAuthorizedSettler(settler.address)
-      ).to.be.revertedWith("Already authorized");
+      ).to.be.revertedWithCustomError(vault, "InvalidState");
     });
 
     it("addAuthorizedSettler() reverts when called by non-owner", async function () {
@@ -199,7 +199,7 @@ describe("SettlementVault", function () {
     it("removeAuthorizedSettler() reverts if not authorized", async function () {
       await expect(
         vault.connect(admin).removeAuthorizedSettler(settler.address)
-      ).to.be.revertedWith("Not authorized");
+      ).to.be.revertedWithCustomError(vault, "InvalidState");
     });
 
     it("removeAuthorizedSettler() reverts when called by non-owner", async function () {
@@ -225,7 +225,7 @@ describe("SettlementVault", function () {
 
       await expect(
         vault.connect(alice).deposit(bob.address, encAmount)
-      ).to.be.revertedWith("Token not supported");
+      ).to.be.revertedWithCustomError(vault, "InvalidInput");
     });
 
     it("reverts when platform is paused", async function () {
@@ -236,7 +236,7 @@ describe("SettlementVault", function () {
 
       await expect(
         vault.connect(alice).deposit(tokenAddr, encAmount)
-      ).to.be.revertedWith("Platform paused");
+      ).to.be.revertedWithCustomError(vault, "Paused");
     });
   });
 
@@ -254,7 +254,7 @@ describe("SettlementVault", function () {
 
       await expect(
         vault.connect(alice).withdraw(bob.address, encAmount)
-      ).to.be.revertedWith("Token not supported");
+      ).to.be.revertedWithCustomError(vault, "InvalidInput");
     });
 
     it("reverts when platform is paused", async function () {
@@ -265,7 +265,7 @@ describe("SettlementVault", function () {
 
       await expect(
         vault.connect(alice).withdraw(tokenAddr, encAmount)
-      ).to.be.revertedWith("Platform paused");
+      ).to.be.revertedWithCustomError(vault, "Paused");
     });
   });
 
@@ -280,7 +280,7 @@ describe("SettlementVault", function () {
       const dummyHash = hre.ethers.zeroPadValue("0x01", 32);
       await expect(
         vault.connect(alice).settleTrade(alice.address, bob.address, tokenAddr, dummyHash)
-      ).to.be.revertedWith("Not authorized settler");
+      ).to.be.revertedWithCustomError(vault, "Unauthorized");
     });
 
     it("prevents self-settlement", async function () {
@@ -288,7 +288,7 @@ describe("SettlementVault", function () {
       const dummyHash = hre.ethers.zeroPadValue("0x01", 32);
       await expect(
         vault.connect(settler).settleTrade(alice.address, alice.address, tokenAddr, dummyHash)
-      ).to.be.revertedWith("Self-settlement");
+      ).to.be.revertedWithCustomError(vault, "InvalidInput");
     });
 
     it("reverts for unsupported token", async function () {
@@ -296,7 +296,7 @@ describe("SettlementVault", function () {
       const dummyHash = hre.ethers.zeroPadValue("0x01", 32);
       await expect(
         vault.connect(settler).settleTrade(alice.address, bob.address, feeCollector.address, dummyHash)
-      ).to.be.revertedWith("Token not supported");
+      ).to.be.revertedWithCustomError(vault, "InvalidInput");
     });
 
     it("reverts for zero address (from)", async function () {
@@ -304,7 +304,7 @@ describe("SettlementVault", function () {
       const dummyHash = hre.ethers.zeroPadValue("0x01", 32);
       await expect(
         vault.connect(settler).settleTrade(hre.ethers.ZeroAddress, bob.address, tokenAddr, dummyHash)
-      ).to.be.revertedWith("Zero address");
+      ).to.be.revertedWithCustomError(vault, "InvalidInput");
     });
 
     it("reverts for zero address (to)", async function () {
@@ -312,7 +312,7 @@ describe("SettlementVault", function () {
       const dummyHash = hre.ethers.zeroPadValue("0x01", 32);
       await expect(
         vault.connect(settler).settleTrade(alice.address, hre.ethers.ZeroAddress, tokenAddr, dummyHash)
-      ).to.be.revertedWith("Zero address");
+      ).to.be.revertedWithCustomError(vault, "InvalidInput");
     });
   });
 });

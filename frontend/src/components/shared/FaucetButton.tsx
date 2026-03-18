@@ -86,9 +86,9 @@ export function FaucetButton() {
           <Droplets size={14} />
         )}
         {status === "pending"
-          ? "Sending..."
+          ? "Processing..."
           : status === "confirming"
-            ? "Confirming..."
+            ? "Processing..."
             : status === "success"
               ? "Received!"
               : status === "error"

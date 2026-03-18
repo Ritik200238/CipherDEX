@@ -36,6 +36,12 @@ contract OTCBoard is ReentrancyGuard, FHEConstants {
     ISettlementVault public vault;
     IPlatformRegistry public registry;
 
+    error Unauthorized();
+    error InvalidInput();
+    error InvalidState();
+    error Expired();
+    error Paused();
+
     mapping(uint256 => OTCRequest) public requests;
     mapping(uint256 => OTCQuote[]) private quotes;
     uint256 public nextRequestId;
@@ -44,15 +50,15 @@ contract OTCBoard is ReentrancyGuard, FHEConstants {
     event QuoteSubmitted(uint256 indexed requestId, uint256 quoteIndex, address indexed quoter);
     event QuoteAccepted(uint256 indexed requestId, uint256 quoteIndex);
     event RequestCancelled(uint256 indexed requestId);
-    event TradeCompleted(address indexed partyA, address indexed partyB, uint256 requestId);
+    event TradeCompleted(bytes32 indexed partyAHash, bytes32 indexed partyBHash, uint256 requestId);
 
     modifier whenNotPaused() {
-        require(!registry.paused(), "Platform paused");
+        if (registry.paused()) revert Paused();
         _;
     }
 
     constructor(address _vault, address _registry) {
-        require(_vault != address(0) && _registry != address(0), "Zero address");
+        if (_vault == address(0) || _registry == address(0)) revert InvalidInput();
         vault = ISettlementVault(_vault);
         registry = IPlatformRegistry(_registry);
         _initFHEConstants();
@@ -73,8 +79,8 @@ contract OTCBoard is ReentrancyGuard, FHEConstants {
         InEuint128 calldata encMaxPrice,
         uint256 deadline
     ) external whenNotPaused returns (uint256 requestId) {
-        require(tokenWant != tokenOffer, "Same token");
-        require(deadline > block.timestamp, "Deadline passed");
+        if (tokenWant == tokenOffer) revert InvalidInput();
+        if (deadline <= block.timestamp) revert Expired();
 
         requestId = nextRequestId++;
         euint128 amount = FHE.asEuint128(encAmount);
@@ -113,9 +119,9 @@ contract OTCBoard is ReentrancyGuard, FHEConstants {
         InEuint128 calldata encQuoteAmount
     ) external whenNotPaused {
         OTCRequest storage req = requests[requestId];
-        require(req.status == RequestStatus.ACTIVE, "Request not active");
-        require(block.timestamp < req.deadline, "Expired");
-        require(req.requester != msg.sender, "Cannot quote own request");
+        if (req.status != RequestStatus.ACTIVE) revert InvalidState();
+        if (block.timestamp >= req.deadline) revert Expired();
+        if (req.requester == msg.sender) revert InvalidInput();
 
         euint128 price = FHE.asEuint128(encQuotePrice);
         euint128 amount = FHE.asEuint128(encQuoteAmount);
@@ -148,12 +154,12 @@ contract OTCBoard is ReentrancyGuard, FHEConstants {
         nonReentrant
     {
         OTCRequest storage req = requests[requestId];
-        require(req.requester == msg.sender, "Not requester");
-        require(req.status == RequestStatus.ACTIVE, "Not active");
-        require(quoteIndex < quotes[requestId].length, "Invalid quote");
+        if (req.requester != msg.sender) revert Unauthorized();
+        if (req.status != RequestStatus.ACTIVE) revert InvalidState();
+        if (quoteIndex >= quotes[requestId].length) revert InvalidInput();
 
         OTCQuote storage quote = quotes[requestId][quoteIndex];
-        require(!quote.accepted, "Already accepted");
+        if (quote.accepted) revert InvalidState();
 
         // Verify quote price is within requester's acceptable range
         ebool aboveMin = FHE.gte(quote.encQuotePrice, req.encMinPrice);
@@ -175,15 +181,20 @@ contract OTCBoard is ReentrancyGuard, FHEConstants {
         quote.accepted = true;
         req.status = RequestStatus.MATCHED;
 
-        emit TradeCompleted(req.requester, quote.quoter, requestId);
+        bytes32 salt = keccak256(abi.encodePacked(block.number, block.prevrandao));
+        emit TradeCompleted(
+            keccak256(abi.encodePacked(req.requester, salt)),
+            keccak256(abi.encodePacked(quote.quoter, salt)),
+            requestId
+        );
         emit QuoteAccepted(requestId, quoteIndex);
     }
 
     /// @notice Cancel an OTC request (requester only)
     function cancelRequest(uint256 requestId) external {
         OTCRequest storage req = requests[requestId];
-        require(req.requester == msg.sender, "Not requester");
-        require(req.status == RequestStatus.ACTIVE, "Not active");
+        if (req.requester != msg.sender) revert Unauthorized();
+        if (req.status != RequestStatus.ACTIVE) revert InvalidState();
 
         req.status = RequestStatus.CANCELLED;
         emit RequestCancelled(requestId);

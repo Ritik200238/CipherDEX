@@ -22,11 +22,18 @@ contract ConfidentialToken is FHERC20 {
     /// @notice Initial supply minted to deployer
     uint64 public constant INITIAL_SUPPLY = 1_000_000 * 1e6;
 
+    /// @notice Admin address for access-controlled minting
+    address public admin;
+
     event FaucetClaimed(address indexed user, uint64 amount);
+
+    error Unauthorized();
+    error InvalidState();
 
     constructor()
         FHERC20("CipherDEX Token", "CDEX", 6)
     {
+        admin = msg.sender;
         // Mint initial supply to deployer for seeding demo data
         _mint(msg.sender, INITIAL_SUPPLY);
     }
@@ -34,19 +41,16 @@ contract ConfidentialToken is FHERC20 {
     /// @notice Public faucet — anyone can claim test tokens once per hour
     /// @dev Rate-limited to prevent abuse. For testnet/demo use only.
     function faucet() external {
-        require(
-            block.timestamp >= lastFaucetClaim[msg.sender] + FAUCET_COOLDOWN,
-            "Faucet: cooldown active"
-        );
+        if (block.timestamp < lastFaucetClaim[msg.sender] + FAUCET_COOLDOWN) revert InvalidState();
         lastFaucetClaim[msg.sender] = block.timestamp;
         _mint(msg.sender, FAUCET_AMOUNT);
         emit FaucetClaimed(msg.sender, FAUCET_AMOUNT);
     }
 
     /// @notice Admin mint for pre-populating demo data
-    /// @dev In production, remove or gate behind governance
+    /// @dev Gated behind admin access control
     function adminMint(address to, uint64 amount) external {
-        // For demo/testnet — in production, add access control
+        if (msg.sender != admin) revert Unauthorized();
         _mint(to, amount);
     }
 }

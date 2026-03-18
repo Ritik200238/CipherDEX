@@ -26,26 +26,29 @@ contract PortfolioTracker is FHEConstants {
 
     uint256 public constant MAX_POSITIONS = 10;
 
+    error InvalidInput();
+    error InvalidState();
+
     event TokenTracked(address indexed user, address indexed token);
     event TokenUntracked(address indexed user, address indexed token);
     event PortfolioComputed(address indexed user, uint256 tokenCount);
 
     constructor(address _vault) {
-        require(_vault != address(0), "Zero address");
+        if (_vault == address(0)) revert InvalidInput();
         vault = ISettlementVault(_vault);
         _initFHEConstants();
     }
 
     /// @notice Add a token to track in portfolio
     function trackToken(address token) external {
-        require(positionCount[msg.sender] < MAX_POSITIONS, "Max positions reached");
-        require(token != address(0), "Zero address");
+        if (positionCount[msg.sender] >= MAX_POSITIONS) revert InvalidState();
+        if (token == address(0)) revert InvalidInput();
 
         // Check not already tracked
         TrackedPosition[] storage userPositions = positions[msg.sender];
         for (uint256 i = 0; i < userPositions.length; i++) {
             if (userPositions[i].token == token && userPositions[i].active) {
-                revert("Already tracked");
+                revert InvalidState();
             }
         }
 
@@ -69,7 +72,7 @@ contract PortfolioTracker is FHEConstants {
                 return;
             }
         }
-        revert("Not tracked");
+        revert InvalidState();
     }
 
     /// @notice Compute total portfolio value across all tracked tokens
@@ -79,8 +82,8 @@ contract PortfolioTracker is FHEConstants {
     function computePortfolioValue(uint64[] calldata tokenPrices) external returns (euint128) {
         TrackedPosition[] storage userPositions = positions[msg.sender];
         uint256 activeCount = positionCount[msg.sender];
-        require(activeCount > 0, "No positions");
-        require(tokenPrices.length == userPositions.length, "Price count mismatch");
+        if (activeCount == 0) revert InvalidState();
+        if (tokenPrices.length != userPositions.length) revert InvalidInput();
 
         euint128 totalValue = ZERO_128;
 
@@ -111,6 +114,7 @@ contract PortfolioTracker is FHEConstants {
         FHE.allowSender(totalValue);
 
         portfolioValues[msg.sender] = totalValue;
+        FHE.allow(portfolioValues[msg.sender], msg.sender);
         emit PortfolioComputed(msg.sender, activeCount);
         return totalValue;
     }

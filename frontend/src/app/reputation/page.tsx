@@ -111,7 +111,7 @@ export default function ReputationPage() {
                 >
                   <Lock size={18} className="text-purple-400" />
                   <span className="text-sm text-purple-300 group-hover:text-purple-200 transition-colors">
-                    Click to unseal
+                    Click to view
                   </span>
                   <Eye size={14} className="text-purple-400" />
                 </button>
@@ -133,7 +133,7 @@ export default function ReputationPage() {
                 ))}
               </div>
               <p className="text-xs text-gray-500">
-                {ratingRevealed ? "No ratings yet" : "Unseal to view"}
+                {ratingRevealed ? "No ratings yet" : "Click to view"}
               </p>
             </div>
           </div>

@@ -73,7 +73,7 @@ describe("LimitOrderEngine", function () {
           await registry.getAddress(),
           hre.ethers.ZeroAddress
         )
-      ).to.be.revertedWith("Zero oracle");
+      ).to.be.revertedWithCustomError(engine, "InvalidInput");
     });
   });
 
@@ -126,7 +126,7 @@ describe("LimitOrderEngine", function () {
         engine.connect(user).createLimitOrder(
           tokenBuyAddr, tokenBuyAddr, 1000, encTrigger, 0
         )
-      ).to.be.revertedWith("Same token");
+      ).to.be.revertedWithCustomError(engine, "InvalidInput");
     });
 
     it("reverts if zero amount", async function () {
@@ -138,7 +138,7 @@ describe("LimitOrderEngine", function () {
         engine.connect(user).createLimitOrder(
           tokenBuyAddr, tokenSellAddr, 0, encTrigger, 0
         )
-      ).to.be.revertedWith("Zero amount");
+      ).to.be.revertedWithCustomError(engine, "InvalidInput");
     });
 
     it("increments nextOrderId", async function () {
@@ -182,7 +182,7 @@ describe("LimitOrderEngine", function () {
     it("reverts if not oracle", async function () {
       await expect(
         engine.connect(user).checkPrice(5000)
-      ).to.be.revertedWith("Not oracle");
+      ).to.be.revertedWithCustomError(engine, "Unauthorized");
     });
 
     it("processes multiple active orders", async function () {
@@ -239,7 +239,7 @@ describe("LimitOrderEngine", function () {
 
       await expect(
         engine.connect(user2).cancelLimitOrder(0)
-      ).to.be.revertedWith("Not owner");
+      ).to.be.revertedWithCustomError(engine, "Unauthorized");
     });
 
     it("reverts if already cancelled", async function () {
@@ -254,7 +254,7 @@ describe("LimitOrderEngine", function () {
 
       await expect(
         engine.connect(user).cancelLimitOrder(0)
-      ).to.be.revertedWith("Not active");
+      ).to.be.revertedWithCustomError(engine, "InvalidState");
     });
   });
 
@@ -270,13 +270,13 @@ describe("LimitOrderEngine", function () {
     it("reverts if not current oracle", async function () {
       await expect(
         engine.connect(user).setOracle(user2.address)
-      ).to.be.revertedWith("Not oracle");
+      ).to.be.revertedWithCustomError(engine, "Unauthorized");
     });
 
     it("reverts for zero address", async function () {
       await expect(
         engine.connect(oracle).setOracle(hre.ethers.ZeroAddress)
-      ).to.be.revertedWith("Zero address");
+      ).to.be.revertedWithCustomError(engine, "InvalidInput");
     });
   });
 });

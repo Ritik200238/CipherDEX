@@ -883,12 +883,12 @@ export default function AuctionsPage() {
                 {txState === "signing" ? (
                   <>
                     <Loader2 size={14} className="animate-spin" />
-                    Sign in wallet...
+                    Processing...
                   </>
                 ) : txState === "confirming" ? (
                   <>
                     <Loader2 size={14} className="animate-spin" />
-                    Confirming...
+                    Processing...
                   </>
                 ) : (
                   <>
@@ -1017,17 +1017,17 @@ export default function AuctionsPage() {
                 {encrypting ? (
                   <>
                     <Loader2 size={14} className="animate-spin" />
-                    Encrypting...
+                    Processing...
                   </>
                 ) : txState === "signing" ? (
                   <>
                     <Loader2 size={14} className="animate-spin" />
-                    Sign in wallet...
+                    Processing...
                   </>
                 ) : txState === "confirming" ? (
                   <>
                     <Loader2 size={14} className="animate-spin" />
-                    Confirming...
+                    Processing...
                   </>
                 ) : (
                   <>
@@ -1159,7 +1159,7 @@ export default function AuctionsPage() {
                       ) : (
                         <Eye size={12} />
                       )}
-                      {unsealing ? "Unsealing..." : "Unseal My Bid"}
+                      {unsealing ? "Processing..." : "View My Bid"}
                     </button>
                   )}
                 </div>

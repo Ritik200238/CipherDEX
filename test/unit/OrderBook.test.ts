@@ -109,7 +109,7 @@ describe("OrderBook", function () {
 
       await expect(
         orderBook.connect(maker).createOrder(tokenAddr, tokenAddr, 500, encPrice, 0)
-      ).to.be.revertedWith("Same token");
+      ).to.be.revertedWithCustomError(orderBook, "InvalidInput");
     });
 
     it("reverts if amount is zero", async function () {
@@ -119,7 +119,7 @@ describe("OrderBook", function () {
 
       await expect(
         orderBook.connect(maker).createOrder(tokenAddr, tokenBAddr, 0, encPrice, 0)
-      ).to.be.revertedWith("Zero amount");
+      ).to.be.revertedWithCustomError(orderBook, "InvalidInput");
     });
   });
 
@@ -158,14 +158,14 @@ describe("OrderBook", function () {
       const encTakerPrice2 = await encryptUint128(taker, 2000n);
       await expect(
         orderBook.connect(taker).fillOrder(0, encTakerPrice2)
-      ).to.be.revertedWith("Order not active");
+      ).to.be.revertedWithCustomError(orderBook, "InvalidState");
     });
 
     it("prevents self-filling", async function () {
       const encTakerPrice = await encryptUint128(maker, 1500n);
       await expect(
         orderBook.connect(maker).fillOrder(0, encTakerPrice)
-      ).to.be.revertedWith("Cannot fill own order");
+      ).to.be.revertedWithCustomError(orderBook, "InvalidInput");
     });
   });
 
@@ -194,7 +194,7 @@ describe("OrderBook", function () {
 
       await expect(
         orderBook.connect(taker).cancelOrder(0)
-      ).to.be.revertedWith("Not order maker");
+      ).to.be.revertedWithCustomError(orderBook, "Unauthorized");
     });
 
     it("reverts if order already cancelled", async function () {
@@ -207,41 +207,37 @@ describe("OrderBook", function () {
 
       await expect(
         orderBook.connect(maker).cancelOrder(0)
-      ).to.be.revertedWith("Order not active");
+      ).to.be.revertedWithCustomError(orderBook, "InvalidState");
     });
   });
 
-  describe("getActiveOrderCount()", function () {
-    it("returns correct count", async function () {
-      expect(await orderBook.getActiveOrderCount()).to.equal(0n);
+  describe("hasActiveOrders()", function () {
+    it("returns false when empty, true after order", async function () {
+      expect(await orderBook.hasActiveOrders()).to.equal(false);
 
       const encPrice = await encryptUint128(maker, 1000n);
       const tokenAddr = await token.getAddress();
       const tokenBAddr = await tokenB.getAddress();
 
       await orderBook.connect(maker).createOrder(tokenAddr, tokenBAddr, 100, encPrice, 0);
-      expect(await orderBook.getActiveOrderCount()).to.equal(1n);
+      expect(await orderBook.hasActiveOrders()).to.equal(true);
 
-      const encPrice2 = await encryptUint128(maker, 2000n);
-      await orderBook.connect(maker).createOrder(tokenAddr, tokenBAddr, 200, encPrice2, 1);
-      expect(await orderBook.getActiveOrderCount()).to.equal(2n);
-
-      // Cancel one
+      // Cancel — back to empty
       await orderBook.connect(maker).cancelOrder(0);
-      expect(await orderBook.getActiveOrderCount()).to.equal(1n);
+      expect(await orderBook.hasActiveOrders()).to.equal(false);
     });
 
-    it("decrements on fill", async function () {
+    it("returns false after fill", async function () {
       const encPrice = await encryptUint128(maker, 1000n);
       const tokenAddr = await token.getAddress();
       const tokenBAddr = await tokenB.getAddress();
 
       await orderBook.connect(maker).createOrder(tokenAddr, tokenBAddr, 100, encPrice, 0);
-      expect(await orderBook.getActiveOrderCount()).to.equal(1n);
+      expect(await orderBook.hasActiveOrders()).to.equal(true);
 
       const encTakerPrice = await encryptUint128(taker, 1500n);
       await orderBook.connect(taker).fillOrder(0, encTakerPrice);
-      expect(await orderBook.getActiveOrderCount()).to.equal(0n);
+      expect(await orderBook.hasActiveOrders()).to.equal(false);
     });
   });
 });

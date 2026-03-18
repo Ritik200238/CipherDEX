@@ -43,21 +43,27 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
     uint256 public constant DEFAULT_SNIPE_EXTENSION = 120;   // Extend by 2 minutes
     uint256 public constant MIN_DURATION = 300;               // 5 minutes minimum
 
+    error Unauthorized();
+    error InvalidInput();
+    error InvalidState();
+    error Expired();
+    error Paused();
+
     event AuctionCreated(uint256 indexed auctionId, address indexed seller, address token, uint256 amount, uint256 deadline);
     event BidPlaced(uint256 indexed auctionId, address indexed bidder, uint256 newDeadline);
     event AuctionClosed(uint256 indexed auctionId);
     event WinnerRevealed(uint256 indexed auctionId, address winner, uint128 winningBid);
     event AuctionSettled(uint256 indexed auctionId);
     event AuctionCancelled(uint256 indexed auctionId);
-    event TradeCompleted(address indexed partyA, address indexed partyB, uint256 auctionId);
+    event TradeCompleted(bytes32 indexed partyAHash, bytes32 indexed partyBHash, uint256 auctionId);
 
     modifier whenNotPaused() {
-        require(!registry.paused(), "Platform paused");
+        if (registry.paused()) revert Paused();
         _;
     }
 
     constructor(address _vault, address _registry) {
-        require(_vault != address(0) && _registry != address(0), "Zero address");
+        if (_vault == address(0) || _registry == address(0)) revert InvalidInput();
         vault = ISettlementVault(_vault);
         registry = IPlatformRegistry(_registry);
         _initFHEConstants();
@@ -76,9 +82,9 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
         uint256 duration,
         uint256 snipeExtension
     ) external whenNotPaused returns (uint256 auctionId) {
-        require(token != paymentToken, "Same token");
-        require(amount > 0, "Zero amount");
-        require(duration >= MIN_DURATION, "Duration too short");
+        if (token == paymentToken) revert InvalidInput();
+        if (amount == 0) revert InvalidInput();
+        if (duration < MIN_DURATION) revert InvalidInput();
 
         auctionId = nextAuctionId++;
         uint256 deadline = block.timestamp + duration;
@@ -117,10 +123,10 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
         whenNotPaused
     {
         Auction storage auction = auctions[auctionId];
-        require(auction.status == AuctionStatus.OPEN, "Auction not open");
-        require(block.timestamp < auction.deadline, "Auction expired");
-        require(auction.seller != msg.sender, "Seller cannot bid");
-        require(!hasBid[auctionId][msg.sender], "Already bid");
+        if (auction.status != AuctionStatus.OPEN) revert InvalidState();
+        if (block.timestamp >= auction.deadline) revert Expired();
+        if (auction.seller == msg.sender) revert InvalidInput();
+        if (hasBid[auctionId][msg.sender]) revert InvalidState();
 
         euint128 newBid = FHE.asEuint128(encBidAmount);
 
@@ -158,10 +164,10 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
     /// @dev Triggers 2-step async decryption. Must wait before calling revealWinner.
     function closeAuction(uint256 auctionId) external {
         Auction storage auction = auctions[auctionId];
-        require(auction.seller == msg.sender, "Not seller");
-        require(auction.status == AuctionStatus.OPEN, "Not open");
-        require(block.timestamp >= auction.deadline, "Auction still active");
-        require(auction.bidCount > 0, "No bids");
+        if (auction.seller != msg.sender) revert Unauthorized();
+        if (auction.status != AuctionStatus.OPEN) revert InvalidState();
+        if (block.timestamp < auction.deadline) revert InvalidState();
+        if (auction.bidCount == 0) revert InvalidState();
 
         // Request async decryption of highest bid and bidder
         FHE.decrypt(auction.highestBid);
@@ -178,14 +184,14 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
         returns (uint128 winningBid, address winner)
     {
         Auction storage auction = auctions[auctionId];
-        require(auction.status == AuctionStatus.CLOSED, "Not closed");
+        if (auction.status != AuctionStatus.CLOSED) revert InvalidState();
 
         // Safe retrieval: returns (value, isReady)
         (uint128 bidValue, bool bidReady) = FHE.getDecryptResultSafe(auction.highestBid);
-        require(bidReady, "Bid not yet decrypted");
+        if (!bidReady) revert InvalidState();
 
         (address bidderValue, bool bidderReady) = FHE.getDecryptResultSafe(auction.highestBidder);
-        require(bidderReady, "Bidder not yet decrypted");
+        if (!bidderReady) revert InvalidState();
 
         auction.revealedBid = bidValue;
         auction.revealedBidder = bidderValue;
@@ -199,10 +205,10 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
     /// @dev Uses plaintext revealed values. Settlement via vault.
     function settleAuction(uint256 auctionId) external nonReentrant {
         Auction storage auction = auctions[auctionId];
-        require(auction.status == AuctionStatus.REVEALED, "Not revealed");
+        if (auction.status != AuctionStatus.REVEALED) revert InvalidState();
 
         address winner = auction.revealedBidder;
-        require(winner != address(0), "No winner");
+        if (winner == address(0)) revert InvalidState();
 
         // Encrypt the settlement amounts for vault (vault works with euint64)
         euint64 auctionAmount = FHE.asEuint64(uint64(auction.amount));
@@ -224,16 +230,21 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
 
         auction.status = AuctionStatus.SETTLED;
 
-        emit TradeCompleted(auction.seller, winner, auctionId);
+        bytes32 salt = keccak256(abi.encodePacked(block.number, block.prevrandao));
+        emit TradeCompleted(
+            keccak256(abi.encodePacked(auction.seller, salt)),
+            keccak256(abi.encodePacked(winner, salt)),
+            auctionId
+        );
         emit AuctionSettled(auctionId);
     }
 
     /// @notice Cancel auction if no bids placed (seller only)
     function cancelAuction(uint256 auctionId) external {
         Auction storage auction = auctions[auctionId];
-        require(auction.seller == msg.sender, "Not seller");
-        require(auction.status == AuctionStatus.OPEN, "Not open");
-        require(auction.bidCount == 0, "Has bids");
+        if (auction.seller != msg.sender) revert Unauthorized();
+        if (auction.status != AuctionStatus.OPEN) revert InvalidState();
+        if (auction.bidCount != 0) revert InvalidState();
 
         auction.status = AuctionStatus.CANCELLED;
         emit AuctionCancelled(auctionId);
@@ -241,7 +252,7 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
 
     /// @notice Bidder views their own bid handle (for unsealing)
     function getMyBid(uint256 auctionId) external view returns (euint128) {
-        require(hasBid[auctionId][msg.sender], "No bid placed");
+        if (!hasBid[auctionId][msg.sender]) revert InvalidState();
         return bids[auctionId][msg.sender];
     }
 
@@ -262,8 +273,8 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
                 a.bidCount, a.status, a.revealedBid, a.revealedBidder);
     }
 
-    /// @notice Get total auctions created
-    function getAuctionCount() external view returns (uint256) {
-        return nextAuctionId;
+    /// @notice Check if any auctions exist
+    function hasAuctions() external view returns (bool) {
+        return nextAuctionId > 0;
     }
 }

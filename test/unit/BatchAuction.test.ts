@@ -118,7 +118,7 @@ describe("BatchAuction", function () {
 
       await expect(
         batchAuction.connect(admin).createRound(tokenAAddr, tokenAAddr, 600)
-      ).to.be.revertedWith("Same token");
+      ).to.be.revertedWithCustomError(batchAuction, "InvalidInput");
     });
 
     it("reverts if not admin", async function () {
@@ -127,7 +127,7 @@ describe("BatchAuction", function () {
 
       await expect(
         batchAuction.connect(buyer1).createRound(tokenAAddr, tokenBAddr, 600)
-      ).to.be.revertedWith("Not admin");
+      ).to.be.revertedWithCustomError(batchAuction, "Unauthorized");
     });
   });
 
@@ -170,14 +170,14 @@ describe("BatchAuction", function () {
       const encMaxPrice = await encryptUint128(buyer1, 1500n);
       await expect(
         batchAuction.connect(buyer1).submitBuyOrder(0, encMaxPrice, 100)
-      ).to.be.revertedWith("Round ended");
+      ).to.be.revertedWithCustomError(batchAuction, "Expired");
     });
 
     it("reverts if zero amount", async function () {
       const encMaxPrice = await encryptUint128(buyer1, 1500n);
       await expect(
         batchAuction.connect(buyer1).submitBuyOrder(0, encMaxPrice, 0)
-      ).to.be.revertedWith("Zero amount");
+      ).to.be.revertedWithCustomError(batchAuction, "InvalidInput");
     });
 
     it("reverts if round is full (5 orders max)", async function () {
@@ -191,7 +191,7 @@ describe("BatchAuction", function () {
       const encMaxPrice = await encryptUint128(buyer1, 2000n);
       await expect(
         batchAuction.connect(buyer1).submitBuyOrder(0, encMaxPrice, 100)
-      ).to.be.revertedWith("Round full");
+      ).to.be.revertedWithCustomError(batchAuction, "InvalidState");
     });
   });
 
@@ -219,7 +219,7 @@ describe("BatchAuction", function () {
       const encMinPrice = await encryptUint128(seller1, 800n);
       await expect(
         batchAuction.connect(seller1).submitSellOrder(0, encMinPrice, 0)
-      ).to.be.revertedWith("Zero amount");
+      ).to.be.revertedWithCustomError(batchAuction, "InvalidInput");
     });
 
     it("reverts if round ended", async function () {
@@ -229,7 +229,7 @@ describe("BatchAuction", function () {
       const encMinPrice = await encryptUint128(seller1, 800n);
       await expect(
         batchAuction.connect(seller1).submitSellOrder(0, encMinPrice, 150)
-      ).to.be.revertedWith("Round ended");
+      ).to.be.revertedWithCustomError(batchAuction, "Expired");
     });
   });
 
@@ -247,7 +247,7 @@ describe("BatchAuction", function () {
 
       await expect(
         batchAuction.connect(admin).closeAndCompute(0, [800, 1000, 1200])
-      ).to.be.revertedWith("Round not ended");
+      ).to.be.revertedWithCustomError(batchAuction, "InvalidState");
     });
 
     it("reverts if wrong ladder size", async function () {
@@ -266,7 +266,7 @@ describe("BatchAuction", function () {
 
       await expect(
         batchAuction.connect(admin).closeAndCompute(0, [800, 1000])
-      ).to.be.revertedWith("Wrong ladder size");
+      ).to.be.revertedWithCustomError(batchAuction, "InvalidInput");
     });
 
     it("reverts if no orders on either side", async function () {
@@ -283,7 +283,7 @@ describe("BatchAuction", function () {
 
       await expect(
         batchAuction.connect(admin).closeAndCompute(0, [800, 1000, 1200])
-      ).to.be.revertedWith("Need both sides");
+      ).to.be.revertedWithCustomError(batchAuction, "InvalidState");
     });
 
     it("computes clearing price and transitions to CLEARING", async function () {
@@ -326,7 +326,7 @@ describe("BatchAuction", function () {
 
       await expect(
         batchAuction.connect(buyer1).closeAndCompute(0, [800, 1000, 1200])
-      ).to.be.revertedWith("Not admin");
+      ).to.be.revertedWithCustomError(batchAuction, "Unauthorized");
     });
   });
 });

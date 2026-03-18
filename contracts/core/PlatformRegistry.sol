@@ -29,6 +29,10 @@ contract PlatformRegistry is Ownable2Step, Pausable {
     /// @notice Total registered users (for stats display)
     uint256 public userCount;
 
+    error InvalidInput();
+    error InvalidState();
+    error PlatformPaused();
+
     event UserRegistered(address indexed user);
     event UserSuspended(address indexed user);
     event UserReinstated(address indexed user);
@@ -40,8 +44,8 @@ contract PlatformRegistry is Ownable2Step, Pausable {
     constructor(address _admin, uint16 _feeBps, address _feeCollector)
         Ownable(_admin)
     {
-        require(_feeBps <= 1000, "Fee too high"); // Max 10%
-        require(_feeCollector != address(0), "Zero fee collector");
+        if (_feeBps > 1000) revert InvalidInput(); // Max 10%
+        if (_feeCollector == address(0)) revert InvalidInput();
         feeBasisPoints = _feeBps;
         feeCollector = _feeCollector;
     }
@@ -51,7 +55,7 @@ contract PlatformRegistry is Ownable2Step, Pausable {
     /// @notice Register the caller as a platform user
     /// @dev Auto-registration on first interaction. No gatekeeping for demo.
     function register() external whenNotPaused {
-        require(!users[msg.sender].registered, "Already registered");
+        if (users[msg.sender].registered) revert InvalidState();
         users[msg.sender] = UserProfile({
             registered: true,
             registeredAt: block.timestamp,
@@ -73,15 +77,15 @@ contract PlatformRegistry is Ownable2Step, Pausable {
 
     /// @notice Suspend a user (admin only)
     function suspendUser(address user) external onlyOwner {
-        require(users[user].registered, "Not registered");
-        require(!users[user].suspended, "Already suspended");
+        if (!users[user].registered) revert InvalidState();
+        if (users[user].suspended) revert InvalidState();
         users[user].suspended = true;
         emit UserSuspended(user);
     }
 
     /// @notice Reinstate a suspended user (admin only)
     function reinstateUser(address user) external onlyOwner {
-        require(users[user].suspended, "Not suspended");
+        if (!users[user].suspended) revert InvalidState();
         users[user].suspended = false;
         emit UserReinstated(user);
     }
@@ -90,15 +94,15 @@ contract PlatformRegistry is Ownable2Step, Pausable {
 
     /// @notice Register a feature contract as authorized
     function registerContract(address contractAddr) external onlyOwner {
-        require(contractAddr != address(0), "Zero address");
-        require(!registeredContracts[contractAddr], "Already registered");
+        if (contractAddr == address(0)) revert InvalidInput();
+        if (registeredContracts[contractAddr]) revert InvalidState();
         registeredContracts[contractAddr] = true;
         emit ContractRegistered(contractAddr);
     }
 
     /// @notice Deregister a feature contract
     function deregisterContract(address contractAddr) external onlyOwner {
-        require(registeredContracts[contractAddr], "Not registered");
+        if (!registeredContracts[contractAddr]) revert InvalidState();
         registeredContracts[contractAddr] = false;
         emit ContractDeregistered(contractAddr);
     }
@@ -112,14 +116,14 @@ contract PlatformRegistry is Ownable2Step, Pausable {
 
     /// @notice Update platform fee (admin only)
     function setFeeBasisPoints(uint16 _feeBps) external onlyOwner {
-        require(_feeBps <= 1000, "Fee too high"); // Max 10%
+        if (_feeBps > 1000) revert InvalidInput(); // Max 10%
         feeBasisPoints = _feeBps;
         emit FeeUpdated(_feeBps);
     }
 
     /// @notice Update fee collector address (admin only)
     function setFeeCollector(address _feeCollector) external onlyOwner {
-        require(_feeCollector != address(0), "Zero address");
+        if (_feeCollector == address(0)) revert InvalidInput();
         feeCollector = _feeCollector;
         emit FeeCollectorUpdated(_feeCollector);
     }

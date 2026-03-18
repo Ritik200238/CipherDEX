@@ -103,7 +103,7 @@ describe("ConfidentialToken", function () {
       await token.connect(alice).faucet();
       await expect(
         token.connect(alice).faucet()
-      ).to.be.revertedWith("Faucet: cooldown active");
+      ).to.be.revertedWithCustomError(token, "InvalidState");
     });
 
     it("allows faucet after cooldown expires", async function () {
@@ -135,11 +135,11 @@ describe("ConfidentialToken", function () {
       await hre.cofhe.mocks.expectPlaintext(BigInt(ctHash), amount);
     });
 
-    it("can be called by anyone (no access control in demo)", async function () {
+    it("reverts when called by non-admin", async function () {
       const amount = 100n * 10n ** 6n;
       await expect(
         token.connect(alice).adminMint(bob.address, amount)
-      ).to.not.be.reverted;
+      ).to.be.revertedWithCustomError(token, "Unauthorized");
     });
 
     it("accumulates with existing balance", async function () {

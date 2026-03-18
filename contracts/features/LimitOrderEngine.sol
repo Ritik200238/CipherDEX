@@ -38,10 +38,18 @@ contract LimitOrderEngine is ReentrancyGuard, FHEConstants {
     /// @notice Oracle address (admin for testnet, Chainlink for production)
     address public oracle;
 
+    /// @notice Admin address for managing oracle
+    address public admin;
+
     /// @notice Last price pushed by oracle
     uint128 public lastOraclePrice;
 
     uint256 public constant MAX_ORDERS_PER_CHECK = 50;
+
+    error Unauthorized();
+    error InvalidInput();
+    error InvalidState();
+    error Paused();
 
     event LimitOrderCreated(uint256 indexed orderId, address indexed owner, TriggerDirection direction);
     event PriceChecked(uint128 price, uint256 ordersChecked);
@@ -51,21 +59,22 @@ contract LimitOrderEngine is ReentrancyGuard, FHEConstants {
     event OracleUpdated(address indexed newOracle);
 
     modifier whenNotPaused() {
-        require(!registry.paused(), "Platform paused");
+        if (registry.paused()) revert Paused();
         _;
     }
 
     modifier onlyOracle() {
-        require(msg.sender == oracle, "Not oracle");
+        if (msg.sender != oracle) revert Unauthorized();
         _;
     }
 
     constructor(address _vault, address _registry, address _oracle) {
-        require(_vault != address(0) && _registry != address(0), "Zero address");
-        require(_oracle != address(0), "Zero oracle");
+        if (_vault == address(0) || _registry == address(0)) revert InvalidInput();
+        if (_oracle == address(0)) revert InvalidInput();
         vault = ISettlementVault(_vault);
         registry = IPlatformRegistry(_registry);
         oracle = _oracle;
+        admin = msg.sender;
         _initFHEConstants();
     }
 
@@ -82,8 +91,8 @@ contract LimitOrderEngine is ReentrancyGuard, FHEConstants {
         InEuint128 calldata encTriggerPrice,
         TriggerDirection direction
     ) external whenNotPaused returns (uint256 orderId) {
-        require(tokenBuy != tokenSell, "Same token");
-        require(amount > 0, "Zero amount");
+        if (tokenBuy == tokenSell) revert InvalidInput();
+        if (amount == 0) revert InvalidInput();
 
         orderId = nextOrderId++;
         euint128 trigger = FHE.asEuint128(encTriggerPrice);
@@ -152,7 +161,7 @@ contract LimitOrderEngine is ReentrancyGuard, FHEConstants {
     /// @dev Owner or keeper calls this. Checks decrypted execution status.
     function settleTriggered(uint256 orderId) external nonReentrant {
         LimitOrder storage order = limitOrders[orderId];
-        require(order.status == OrderStatus.ACTIVE, "Not active");
+        if (order.status != OrderStatus.ACTIVE) revert InvalidState();
 
         // Request decryption of execution status
         FHE.decrypt(order.executed);
@@ -164,10 +173,10 @@ contract LimitOrderEngine is ReentrancyGuard, FHEConstants {
     /// @notice Complete settlement after decrypt result is ready
     function completeSettlement(uint256 orderId) external nonReentrant {
         LimitOrder storage order = limitOrders[orderId];
-        require(order.status == OrderStatus.TRIGGERED, "Not triggered");
+        if (order.status != OrderStatus.TRIGGERED) revert InvalidState();
 
         (bool wasExecuted, bool ready) = FHE.getDecryptResultSafe(order.executed);
-        require(ready, "Not yet decrypted");
+        if (!ready) revert InvalidState();
 
         if (wasExecuted) {
             // Execute the trade through vault
@@ -192,8 +201,8 @@ contract LimitOrderEngine is ReentrancyGuard, FHEConstants {
     /// @notice Owner cancels their limit order
     function cancelLimitOrder(uint256 orderId) external {
         LimitOrder storage order = limitOrders[orderId];
-        require(order.owner == msg.sender, "Not owner");
-        require(order.status == OrderStatus.ACTIVE, "Not active");
+        if (order.owner != msg.sender) revert Unauthorized();
+        if (order.status != OrderStatus.ACTIVE) revert InvalidState();
 
         order.status = OrderStatus.CANCELLED;
         _removeFromActive(orderId);
@@ -202,21 +211,21 @@ contract LimitOrderEngine is ReentrancyGuard, FHEConstants {
 
     /// @notice Owner views their trigger price handle (for unsealing)
     function getMyTriggerPrice(uint256 orderId) external view returns (euint128) {
-        require(limitOrders[orderId].owner == msg.sender, "Not owner");
+        if (limitOrders[orderId].owner != msg.sender) revert Unauthorized();
         return limitOrders[orderId].encTriggerPrice;
     }
 
-    /// @notice Update oracle address (admin only — via registry owner)
+    /// @notice Update oracle address (admin only)
     function setOracle(address _oracle) external {
-        require(msg.sender == oracle, "Not oracle");
-        require(_oracle != address(0), "Zero address");
+        if (msg.sender != admin) revert Unauthorized();
+        if (_oracle == address(0)) revert InvalidInput();
         oracle = _oracle;
         emit OracleUpdated(_oracle);
     }
 
-    /// @notice Get active order count
-    function getActiveOrderCount() external view returns (uint256) {
-        return activeOrderIds.length;
+    /// @notice Check if there are any active orders
+    function hasActiveOrders() external view returns (bool) {
+        return activeOrderIds.length > 0;
     }
 
     function _removeFromActive(uint256 orderId) internal {

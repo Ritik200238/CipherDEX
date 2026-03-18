@@ -51,6 +51,12 @@ contract BatchAuction is ReentrancyGuard, FHEConstants {
     uint256 public constant PRICE_LADDER_STEPS = 3;
     uint256 public constant DEFAULT_ROUND_DURATION = 300; // 5 minutes
 
+    error Unauthorized();
+    error InvalidInput();
+    error InvalidState();
+    error Expired();
+    error Paused();
+
     // Temporary storage for clearing computation
     mapping(uint256 => euint128) private encClearingPrice;
 
@@ -62,18 +68,18 @@ contract BatchAuction is ReentrancyGuard, FHEConstants {
     event RoundSettled(uint256 indexed roundId);
 
     modifier onlyAdmin() {
-        require(msg.sender == admin, "Not admin");
+        if (msg.sender != admin) revert Unauthorized();
         _;
     }
 
     modifier whenNotPaused() {
-        require(!registry.paused(), "Platform paused");
+        if (registry.paused()) revert Paused();
         _;
     }
 
     constructor(address _vault, address _registry, address _admin) {
-        require(_vault != address(0) && _registry != address(0), "Zero address");
-        require(_admin != address(0), "Zero admin");
+        if (_vault == address(0) || _registry == address(0)) revert InvalidInput();
+        if (_admin == address(0)) revert InvalidInput();
         vault = ISettlementVault(_vault);
         registry = IPlatformRegistry(_registry);
         admin = _admin;
@@ -86,7 +92,7 @@ contract BatchAuction is ReentrancyGuard, FHEConstants {
         address tokenB,
         uint256 duration
     ) external onlyAdmin returns (uint256 roundId) {
-        require(tokenA != tokenB, "Same token");
+        if (tokenA == tokenB) revert InvalidInput();
         uint256 dur = duration > 0 ? duration : DEFAULT_ROUND_DURATION;
 
         roundId = nextRoundId++;
@@ -111,10 +117,10 @@ contract BatchAuction is ReentrancyGuard, FHEConstants {
         uint256 amount
     ) external whenNotPaused {
         Round storage round = rounds[roundId];
-        require(round.status == RoundStatus.COLLECTING, "Not collecting");
-        require(block.timestamp < round.endTime, "Round ended");
-        require(buyOrders[roundId].length + sellOrders[roundId].length < MAX_ORDERS_PER_ROUND, "Round full");
-        require(amount > 0, "Zero amount");
+        if (round.status != RoundStatus.COLLECTING) revert InvalidState();
+        if (block.timestamp >= round.endTime) revert Expired();
+        if (buyOrders[roundId].length + sellOrders[roundId].length >= MAX_ORDERS_PER_ROUND) revert InvalidState();
+        if (amount == 0) revert InvalidInput();
 
         euint128 maxPrice = FHE.asEuint128(encMaxPrice);
         FHE.allowThis(maxPrice);
@@ -137,10 +143,10 @@ contract BatchAuction is ReentrancyGuard, FHEConstants {
         uint256 amount
     ) external whenNotPaused {
         Round storage round = rounds[roundId];
-        require(round.status == RoundStatus.COLLECTING, "Not collecting");
-        require(block.timestamp < round.endTime, "Round ended");
-        require(buyOrders[roundId].length + sellOrders[roundId].length < MAX_ORDERS_PER_ROUND, "Round full");
-        require(amount > 0, "Zero amount");
+        if (round.status != RoundStatus.COLLECTING) revert InvalidState();
+        if (block.timestamp >= round.endTime) revert Expired();
+        if (buyOrders[roundId].length + sellOrders[roundId].length >= MAX_ORDERS_PER_ROUND) revert InvalidState();
+        if (amount == 0) revert InvalidInput();
 
         euint128 minPrice = FHE.asEuint128(encMinPrice);
         FHE.allowThis(minPrice);
@@ -166,13 +172,13 @@ contract BatchAuction is ReentrancyGuard, FHEConstants {
         onlyAdmin
     {
         Round storage round = rounds[roundId];
-        require(round.status == RoundStatus.COLLECTING, "Not collecting");
-        require(block.timestamp >= round.endTime, "Round not ended");
-        require(priceLadder.length == PRICE_LADDER_STEPS, "Wrong ladder size");
+        if (round.status != RoundStatus.COLLECTING) revert InvalidState();
+        if (block.timestamp < round.endTime) revert InvalidState();
+        if (priceLadder.length != PRICE_LADDER_STEPS) revert InvalidInput();
 
         BuyOrder[] storage buys = buyOrders[roundId];
         SellOrder[] storage sells = sellOrders[roundId];
-        require(buys.length > 0 && sells.length > 0, "Need both sides");
+        if (buys.length == 0 || sells.length == 0) revert InvalidState();
 
         // Find clearing price: highest price where buyVolume >= sellVolume
         euint128 bestClearingPrice = ZERO_128;
@@ -218,10 +224,10 @@ contract BatchAuction is ReentrancyGuard, FHEConstants {
     /// @notice Retrieve clearing price after async decryption
     function revealClearingPrice(uint256 roundId) external returns (uint256) {
         Round storage round = rounds[roundId];
-        require(round.status == RoundStatus.CLEARING, "Not in clearing");
+        if (round.status != RoundStatus.CLEARING) revert InvalidState();
 
         (uint128 price, bool ready) = FHE.getDecryptResultSafe(encClearingPrice[roundId]);
-        require(ready, "Not yet decrypted");
+        if (!ready) revert InvalidState();
 
         round.clearingPrice = uint256(price);
         emit ClearingPriceRevealed(roundId, uint256(price));
@@ -231,8 +237,8 @@ contract BatchAuction is ReentrancyGuard, FHEConstants {
     /// @notice Settle all eligible orders at clearing price
     function settleRound(uint256 roundId) external onlyAdmin nonReentrant {
         Round storage round = rounds[roundId];
-        require(round.status == RoundStatus.CLEARING, "Not in clearing");
-        require(round.clearingPrice > 0, "Price not revealed");
+        if (round.status != RoundStatus.CLEARING) revert InvalidState();
+        if (round.clearingPrice == 0) revert InvalidState();
 
         uint256 cp = round.clearingPrice;
 
@@ -283,7 +289,7 @@ contract BatchAuction is ReentrancyGuard, FHEConstants {
                 buyOrders[roundId].length, sellOrders[roundId].length);
     }
 
-    function getRoundCount() external view returns (uint256) {
-        return nextRoundId;
+    function hasRounds() external view returns (bool) {
+        return nextRoundId > 0;
     }
 }

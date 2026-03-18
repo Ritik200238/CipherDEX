@@ -30,6 +30,10 @@ contract Reputation {
     /// @notice Admin address for managing authorized callers
     address public admin;
 
+    error Unauthorized();
+    error InvalidInput();
+    error InvalidState();
+
     // Pre-encrypted constants for rating validation
     euint8 private EUINT8_ONE;
     euint8 private EUINT8_FIVE;
@@ -42,17 +46,17 @@ contract Reputation {
     event CallerRevoked(address indexed caller);
 
     modifier onlyAdmin() {
-        require(msg.sender == admin, "Not admin");
+        if (msg.sender != admin) revert Unauthorized();
         _;
     }
 
     modifier onlyAuthorizedCaller() {
-        require(authorizedCallers[msg.sender], "Not authorized");
+        if (!authorizedCallers[msg.sender]) revert Unauthorized();
         _;
     }
 
     constructor(address _registry, address _admin) {
-        require(_registry != address(0) && _admin != address(0), "Zero address");
+        if (_registry == address(0) || _admin == address(0)) revert InvalidInput();
         registry = IPlatformRegistry(_registry);
         admin = _admin;
 
@@ -70,7 +74,7 @@ contract Reputation {
     /// @dev Non-blocking: if this reverts, the calling contract's trade still succeeds
     ///      because feature contracts use try/catch or emit events instead of direct calls
     function recordTrade(address partyA, address partyB) external onlyAuthorizedCaller {
-        require(partyA != partyB, "Self-trade");
+        if (partyA == partyB) revert InvalidInput();
         tradeCounts[partyA]++;
         tradeCounts[partyB]++;
         emit TradeRecorded(partyA, partyB);
@@ -87,11 +91,11 @@ contract Reputation {
         InEuint8 calldata encRating,
         uint256 tradeId
     ) external {
-        require(counterparty != msg.sender, "Cannot rate self");
-        require(counterparty != address(0), "Zero address");
+        if (counterparty == msg.sender) revert InvalidInput();
+        if (counterparty == address(0)) revert InvalidInput();
 
         bytes32 ratingKey = keccak256(abi.encodePacked(msg.sender, counterparty, tradeId));
-        require(!hasRated[ratingKey], "Already rated");
+        if (hasRated[ratingKey]) revert InvalidState();
 
         euint8 rating = FHE.asEuint8(encRating);
 
@@ -109,6 +113,7 @@ contract Reputation {
 
         totalScores[counterparty] = FHE.add(totalScores[counterparty], ratingAsU64);
         FHE.allowThis(totalScores[counterparty]);
+        FHE.allow(totalScores[counterparty], counterparty);
 
         hasRated[ratingKey] = true;
         emit RatingSubmitted(msg.sender, counterparty);
@@ -118,7 +123,7 @@ contract Reputation {
     /// @dev FHE ops: div(1, plaintext tradeCount) = 1 op
     /// @dev Only the user themselves can call this and unseal the result
     function computeMyReputation() external returns (euint64) {
-        require(tradeCounts[msg.sender] > 0, "No trades");
+        if (tradeCounts[msg.sender] == 0) revert InvalidState();
 
         // Division: trivially encrypt the plaintext count, then divide two encrypted values
         euint64 avgRep = FHE.div(totalScores[msg.sender], FHE.asEuint64(uint256(tradeCounts[msg.sender])));
@@ -145,7 +150,7 @@ contract Reputation {
     // ─── Admin ──────────────────────────────────────────────
 
     function addAuthorizedCaller(address caller) external onlyAdmin {
-        require(caller != address(0), "Zero address");
+        if (caller == address(0)) revert InvalidInput();
         authorizedCallers[caller] = true;
         emit CallerAuthorized(caller);
     }
