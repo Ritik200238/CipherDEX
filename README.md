@@ -1,222 +1,259 @@
-# CipherDEX — Confidential P2P Trading Protocol
+# CipherDEX
 
-**The first fully encrypted peer-to-peer trading protocol on Fhenix FHE.**
+**The private operating system for DAOs — launch tokens, pay teams, trade treasury, hire talent. All encrypted.**
 
-Every order price, bid amount, escrow term, limit trigger, portfolio balance, and reputation score is encrypted on-chain. CipherDEX computes matches, enforces conditions, and settles trades — all on data nobody can see.
+CipherDEX is a private finance protocol built on Fhenix FHE (Fully Homomorphic Encryption). Every bid, payment amount, trade price, and reputation score is encrypted on-chain. The blockchain processes your finances without ever seeing the numbers.
 
-No pools. No AMMs. Direct wallet-to-wallet settlement via encrypted FHERC20 tokens.
+[Launch App](https://cipher-dex.vercel.app) | [Etherscan Contracts](https://sepolia.etherscan.io/address/0xd5524d656477E803a6BE96b5C044CdBb492C8297)
 
 ---
 
-## Why FHE is Foundational
+## The Problem
 
-Remove FHE and the entire protocol breaks:
+Every transaction on a public blockchain is a postcard:
 
-| Feature | FHE Operation | What Breaks Without It |
-|---------|--------------|----------------------|
-| P2P Matching | `FHE.gte(takerPrice, makerPrice)` | Prices are public → front-runnable |
-| Sealed Auctions | `FHE.gt()` + `FHE.max()` | Bids visible → trivial gaming |
-| Escrow | `FHE.eq(deposit, terms)` | Deal terms exposed on-chain |
-| Limit Orders | `FHE.lte(oracle, trigger)` | Triggers visible → MEV exploitation |
-| Batch Clearing | `FHE.add()` + `FHE.gte()` | Price manipulation possible |
-| Portfolio | `FHE.mul()` + `FHE.add()` | Whale positions visible |
-| Reputation | `FHE.add()` + `FHE.div()` | Individual ratings exposed |
-| OTC | `FHE.gte()` + `FHE.lte()` | Large orders move market |
+- **DAOs** — contributor salaries visible to everyone. Politics. Resentment.
+- **Token launches** — bots see first bid, front-run with larger bid. Retail loses.
+- **Large trades** — whale orders move the market before execution. 2-5% slippage.
+- **Freelance hiring** — competitors see each other's bids, undercut to race-to-bottom.
 
-**14+ distinct FHE operations** used meaningfully in core business logic across 8 features.
+Financial privacy isn't a feature request. It's missing infrastructure.
+
+## The Solution
+
+CipherDEX encrypts every sensitive value using FHE before it hits the chain. Smart contracts compare, add, and settle encrypted values. The plaintext never exists on-chain.
+
+```
+You bid $5,000          →  Encrypted in your browser (TFHE + ZK proof)
+Smart contract runs     →  FHE.gt(newBid, highestBid) — computes on ciphertext
+Winner determined       →  FHE.decrypt(winningBid) — only result revealed
+Losing bids             →  Stay encrypted. Forever. Nobody ever sees them.
+```
+
+No trusted intermediary. No hardware enclaves. No commit-reveal. Pure math.
+
+---
+
+## Features
+
+### 5 Auction Types
+
+| Type | Mechanism | Privacy |
+|------|-----------|---------|
+| **Sealed Bid** | Highest bid wins. Anti-snipe timer. | Bids + reserve price encrypted forever |
+| **Vickrey (2nd Price)** | Highest wins, pays 2nd price. Truthful bidding. | Both highest and 2nd tracked on ciphertext |
+| **Dutch** | Price decays over time. Buy at current price. | Purchase amounts encrypted |
+| **Batch Clearing** | Uniform price where supply meets demand. | Order volumes counted on ciphertext |
+| **Overflow / Fixed** | Fixed price. Oversubscribed = pro-rata allocation. | Individual deposits encrypted |
+
+### Private Payments
+
+Send money to multiple recipients where each person sees only their own amount.
+
+- Encrypted per-recipient amounts — nobody sees what anyone else got
+- Reusable templates for recurring payroll
+- Single-step claim — amount never decrypted on-chain (end-to-end encrypted)
+- Payment history tracking
+
+### OTC Desk
+
+Private venue for large trades. No slippage. No front-running.
+
+- Encrypted RFQ with hidden price range bounds
+- Multi-quote competition (quoters blind to each other)
+- Atomic settlement via shared encrypted vault
+- Zero market impact
+
+### Freelance Bidding
+
+Clients post jobs. Freelancers bid encrypted prices. Lowest bid wins.
+
+- Blind bidding — no undercutting
+- Milestone-based escrow release
+- 3-voter encrypted dispute resolution (votes private, majority computed on ciphertext)
+- 14-day auto-release timer (Upwork-style protection)
+
+### Infrastructure
+
+| Component | Purpose |
+|-----------|---------|
+| **FHERC20 Token** | Encrypted balances. Built-in faucet. |
+| **Settlement Vault** | Shared encrypted balance ledger. All features settle through here. |
+| **Token Vesting** | Cliff + linear unlock with encrypted amounts. On-chain enforcement. |
+| **Merkle Allowlists** | Whitelist-gated launches. KYC, NFT-holder, VIP rounds. |
+| **FHE Referrals** | Referrer earns % without identity linked on-chain. |
+| **Claim NFT (ERC721)** | Tradeable positions. Winner sells claim before maturity. |
+| **Encrypted Reputation** | Composable credit bureau API. Other contracts query without seeing scores. |
+
+---
+
+## What's New — Innovations That Don't Exist Anywhere Else
+
+### Blind Floor Auction
+
+In every auction system ever built, the seller's reserve price is eventually revealed. In CipherDEX, the reserve is encrypted with FHE and **never decrypted**. Bidders cannot calculate the floor — they must bid their true value. This is a new game-theoretic equilibrium only possible with FHE.
+
+### Encrypted Dispute Resolution
+
+When a freelance milestone is disputed, 3 community voters submit encrypted votes (1 = approve, 0 = reject). The contract computes `FHE.add(vote1 + vote2 + vote3)` on ciphertext, decrypts only the sum. If >= 2, freelancer wins. Individual votes stay encrypted forever. No peer pressure. No retaliation.
+
+### Cross-Feature Encrypted Flow
+
+One vault. Four features. Zero plaintext touchpoints. Deposit once → bid on auction → win tokens → trade OTC → pay developer — all on encrypted balances that never touch plaintext between features.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         FRONTEND (Next.js)                         │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ │
-│  │ Trading  │ │ Auction  │ │  Escrow  │ │Portfolio │ │   OTC    │ │
-│  │Dashboard │ │  House   │ │  Center  │ │ Tracker  │ │  Board   │ │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ │
-│       └──────────┬──┴──────────┬┴────────────┬┴────────────┘       │
-│            ┌─────┴──────┐ ┌────┴─────┐ ┌─────┴──────┐              │
-│            │  cofhejs   │ │ ethers/  │ │  Permit    │              │
-│            │ (encrypt)  │ │  viem    │ │  Manager   │              │
-│            └─────┬──────┘ └────┬─────┘ └─────┬──────┘              │
-└──────────────────┼─────────────┼─────────────┼─────────────────────┘
-                   │             │             │
-═══════════════════╪═════════════╪═════════════╪══════ EVM CHAIN ═════
-                   ▼             ▼             ▼
-   ┌──────────────────────────────────────────────────┐
-   │         SettlementVault.sol (Central Custody)     │
-   │  Encrypted balance ledger • FHERC20 settlement    │
-   └──┬──────┬───────┬───────┬───────┬───────┬───┬────┘
-      │      │       │       │       │       │   │
-   ┌──┴──┐┌──┴───┐┌──┴──┐┌──┴───┐┌──┴───┐┌──┴┐┌─┴──┐
-   │Order││Sealed││Escro││Limit ││Batch ││OTC││Rep │
-   │Book ││Auctn ││  w  ││Order ││Auctn ││Brd││    │
-   └─────┘└──────┘└─────┘└──────┘└──────┘└───┘└────┘
+┌────────────────────────────────────────────────────────┐
+│                     CipherDEX Protocol                  │
+│                                                         │
+│  Core Infrastructure                                    │
+│  ├── ConfidentialToken (FHERC20 + faucet)              │
+│  ├── SettlementVault (encrypted balance ledger)         │
+│  ├── PlatformRegistry (users, fees, pause)              │
+│  ├── AuctionClaim (ERC721 tradeable positions)          │
+│  ├── TokenVesting (cliff + linear, encrypted)           │
+│  ├── AllowlistGate (Merkle whitelist)                   │
+│  ├── Referrals (FHE-private earnings)                   │
+│  └── Reputation (composable credit bureau)              │
+│                                                         │
+│  Token Launch (5 auction types)                         │
+│  ├── SealedAuction (1st price + anti-snipe)            │
+│  ├── VickreyAuction (2nd price)                         │
+│  ├── DutchAuction (descending price)                    │
+│  ├── BatchAuction (uniform clearing)                    │
+│  └── OverflowSale (fixed price + pro-rata)             │
+│                                                         │
+│  Finance                                                │
+│  ├── PrivatePayments (encrypted splits)                 │
+│  ├── OTCBoard (whale trading)                           │
+│  └── FreelanceBidding (blind bids + milestones)         │
+│                                                         │
+│  Trading                                                │
+│  ├── OrderBook (P2P matching)                           │
+│  ├── Escrow (encrypted term verification)               │
+│  └── LimitOrderEngine (private triggers)                │
+│                                                         │
+│  Analytics                                              │
+│  └── PortfolioTracker (encrypted valuation)             │
+└────────────────────────────────────────────────────────┘
 ```
 
-### Key Design Decision: SettlementVault Pattern
+---
 
-All 8 feature contracts settle through a single **SettlementVault**. Feature contracts never hold tokens directly — they instruct the vault to move funds. This gives us:
-- **One audit surface** for token custody
-- **One ACL setup** for user balances
-- **Replaceable features** without migrating funds
+## Deployed Contracts
+
+All 20 contracts deployed and verified on **Ethereum Sepolia (11155111)**.
+
+| Contract | Address | Etherscan |
+|----------|---------|-----------|
+| ConfidentialToken | `0xd5524d...C8297` | [View](https://sepolia.etherscan.io/address/0xd5524d656477E803a6BE96b5C044CdBb492C8297#code) |
+| PlatformRegistry | `0xC4b6BB...438f` | [View](https://sepolia.etherscan.io/address/0xC4b6BB51F81eAd8dd65C6Aa26865f4793B2A438f#code) |
+| SettlementVault | `0xa5f512...71Cd` | [View](https://sepolia.etherscan.io/address/0xa5f512e526aE4E7CBd5e6f4593396d7fcaeE71Cd#code) |
+| AuctionClaim | `0x9c95BE...c51c` | [View](https://sepolia.etherscan.io/address/0x9c95BEE65C81e1508b37e3f2c240dB65A508c51c#code) |
+| SealedAuction | `0x9F1519...2f60` | [View](https://sepolia.etherscan.io/address/0x9F15192dA0520EB7256cDc04730D65D627E92f60#code) |
+| VickreyAuction | `0x04270b...570e` | [View](https://sepolia.etherscan.io/address/0x04270b991B3a9aF98EEc50ee1cadA40Eabc3570e#code) |
+| DutchAuction | `0x44A04f...4845` | [View](https://sepolia.etherscan.io/address/0x44A04fFd7B3F14F279f3F8cEc530C2A21cb04845#code) |
+| BatchAuction | `0x450331...0106` | [View](https://sepolia.etherscan.io/address/0x4503315aD5993647212cd577A3B000053cd90106#code) |
+| OverflowSale | `0x6f5348...aA27` | [View](https://sepolia.etherscan.io/address/0x6f5348fF3C725C2DD34E353F1B35d3AE778baA27#code) |
+| PrivatePayments | `0x04F8b0...2E34` | [View](https://sepolia.etherscan.io/address/0x04F8b006A299dfE677e108ebd616E2F21c722E34#code) |
+| OTCBoard | `0xe64365...8c36` | [View](https://sepolia.etherscan.io/address/0xe643654be7792d0Ba957bc8CECbE74C1e2c28c36#code) |
+| FreelanceBidding | `0xef9c5d...C0FA` | [View](https://sepolia.etherscan.io/address/0xef9c5d3457CcE981f9641213B81832272383C0FA#code) |
+| OrderBook | `0xeAD0E2...27a2` | [View](https://sepolia.etherscan.io/address/0xeAD0E2a126E3121FCacEb50470AaD38B6F3027a2#code) |
+| Escrow | `0x2019c9...050C` | [View](https://sepolia.etherscan.io/address/0x2019c9B7B045F782bD63ff7858d2e1fbA502050C#code) |
+| LimitOrderEngine | `0x83B4Df...9878` | [View](https://sepolia.etherscan.io/address/0x83B4Df4CcE798a2Ec62Fed8445AdC0936bCF9878#code) |
+| PortfolioTracker | `0x9e3139...7ffB` | [View](https://sepolia.etherscan.io/address/0x9e3139C53c66dfAcd80a6c9f1E78B45939467ffB#code) |
+| Reputation | `0x23e5Dd...73EB` | [View](https://sepolia.etherscan.io/address/0x23e5DdcaF6946123769BBe32BA0Fd6eDd7A973EB#code) |
+| TokenVesting | `0x920ee2...18Dc` | [View](https://sepolia.etherscan.io/address/0x920ee2B93b1C7316811D8aC78F85bbA8bB8518Dc#code) |
+| AllowlistGate | `0x0579B8...C296` | [View](https://sepolia.etherscan.io/address/0x0579B82D5d0F35Ca76DDC0E384D96DfE589fC296#code) |
+| Referrals | `0xc7c63B...BC3D` | [View](https://sepolia.etherscan.io/address/0xc7c63B43365997F02077188c664DE1a33Db3BC3D#code) |
 
 ---
 
-## Privacy Model
+## Security
 
-| Data | Encrypted? | Who Sees It | How |
-|------|-----------|-------------|-----|
-| Order prices | `euint128` | Owner only | `cofhejs.unseal()` |
-| Auction bids | `euint128` | Bidder only | `cofhejs.unseal()` |
-| Winning bid | Decrypted | Everyone | `FHE.decrypt()` after close |
-| Escrow terms | `euint128` | Both parties | `FHE.allow()` to each |
-| Limit triggers | `euint128` | Owner only | `cofhejs.unseal()` |
-| Portfolio balances | `euint64` | Owner only | `cofhejs.unseal()` |
-| Individual ratings | `euint8` | Nobody | Used only in aggregation |
-| OTC amounts | `euint128` | Requester only | `cofhejs.unseal()` |
-| Token pairs, amounts, deadlines | Plaintext | Everyone | Needed for discoverability |
+| Layer | Approach |
+|-------|----------|
+| **Privacy** | `FHE.select()` over `require()` — a revert leaks 1 bit. Enough reverts reconstruct a balance. CipherDEX never reverts on encrypted conditions. |
+| **Encryption** | Every encrypted input is ZK-verified and signed by the CoFHE threshold network |
+| **Access Control** | 4-tier FHE permit system: `allowThis` → `allowSender` → `allow` → `allowTransient` |
+| **Contracts** | ReentrancyGuard on all state-changing functions. AccessControl for role-based permissions. |
+| **Zero-Replacement** | Insufficient balance = transfer 0, not revert. Constant-time execution. |
+| **Anti-Snipe** | Late bids extend auction deadline. Prevents last-second MEV. |
+| **Emergency** | 7-day timeout on stuck decryption. Funds always recoverable. |
+| **Auto-Release** | 14-day silence on freelance milestones = auto-release to freelancer. |
 
-**Rule**: On-chain `FHE.decrypt()` makes data PUBLIC. Private data uses off-chain `cofhejs.unseal()` with permits.
+## FHE Operations Used
 
----
+22+ distinct operations across 20 contracts:
 
-## The 8 Features
+`asEuint8` `asEuint64` `asEuint128` `asEaddress` `asEbool` `gt` `gte` `lt` `lte` `eq` `max` `min` `and` `or` `select` `add` `sub` `mul` `div` `decrypt` `allowThis` `allow` `allowTransient`
 
-### CORE: P2P Encrypted Order Matching
-Makers post sell orders with encrypted prices (`euint128`). Takers submit their encrypted buy price. `FHE.gte(takerPrice, makerPrice)` determines if there's a match — nobody sees either price. Settlement via FHERC20 through the SettlementVault. Supports partial fills.
-
-### 1. Sealed-Bid Auctions + Anti-Snipe
-Seller lists tokens. Bidders submit encrypted bids. `FHE.gt()` + `FHE.max()` track the highest bid without revealing any individual bids. Anti-snipe: late bids extend the deadline (bid amounts stay hidden). Async 2-step: close → reveal → settle.
-
-### 2. Encrypted Escrow
-Two parties agree off-chain. Both deposit with encrypted terms. `FHE.eq()` verifies deposits match agreed amounts. Match → auto-release. Mismatch → refund. Nobody on-chain sees the deal terms.
-
-### 3. Private Limit Orders
-Users set encrypted trigger prices. A manual oracle pushes plaintext prices. `FHE.lte(oraclePrice, encryptedTrigger)` checks if triggered. MEV bots can't front-run because the trigger price is hidden.
-
-### 4. Batch Auction (Clearing Price)
-Collects buy/sell orders over a time window (all prices encrypted). Computes a clearing price using a plaintext price ladder with `FHE.gte()` comparisons. Everyone trades at the same price — completely eliminates front-running.
-
-### 5. Hidden Portfolio Tracker
-Users track multiple token positions. `FHE.mul(balance, price)` + `FHE.add()` computes total portfolio value. Only the owner can unseal their total — nobody else sees holdings.
-
-### 6. Reputation System (Non-Blocking)
-After trades, parties rate each other (encrypted `euint8`, 1-5). `FHE.add()` accumulates scores, `FHE.div()` computes averages. Users see own reputation. Individual ratings are never exposed. Feature contracts emit events — if Reputation is down, trading continues.
-
-### 7. Anti-Snipe Auction Timer
-Bids in the last 60 seconds extend the deadline. Snipers see the extension (metadata) but NOT the bid amount. Sniping is pointless when you can't see what to outbid.
-
-### 8. Private OTC Board
-Users post requests with encrypted amounts and price ranges. Counterparties see requests exist but not sizes. `FHE.gte()` + `FHE.lte()` verify quotes are within range. Whales trade without moving the market.
-
----
-
-## Smart Contract Reference
-
-| Contract | Lines | Purpose | Key FHE Ops |
-|----------|-------|---------|-------------|
-| `ConfidentialToken` | 52 | FHERC20 token + testnet faucet | Inherits FHERC20 |
-| `PlatformRegistry` | 143 | Users, fees, pause | None (admin) |
-| `SettlementVault` | 190 | Central custody + encrypted settlement | add, sub, lte, select |
-| `OrderBook` | 206 | P2P order matching | gte, select |
-| `SealedAuction` | 265 | Sealed-bid + anti-snipe | gt, max, select, decrypt |
-| `Escrow` | 240 | Encrypted term verification | eq, and, select |
-| `LimitOrderEngine` | 230 | Private trigger orders | lte, gte, or, select |
-| `BatchAuction` | 285 | Clearing price discovery | gte, lte, add, select, decrypt |
-| `PortfolioTracker` | 136 | Portfolio valuation | mul, add |
-| `Reputation` | 157 | Encrypted ratings | gte, lte, and, select, add, div |
-| `OTCBoard` | 220 | Private whale trading | gte, lte, and, select |
-
-**Total: 2,242 lines of Solidity across 16 files (11 contracts + 4 interfaces + 1 library)**
-
----
-
-## Demo Instructions (5 Minutes)
-
-### Prerequisites
-- MetaMask browser extension
-- Arbitrum Sepolia testnet configured
-- Some Arbitrum Sepolia ETH ([faucet](https://faucet.arbitrum.io/))
-
-### Steps
-
-1. **Visit** the app (deployed URL)
-2. **Connect** MetaMask wallet (Arbitrum Sepolia)
-3. **Get tokens** — Click "Get Test Tokens" (mints 1000 CDEX)
-4. **Deposit** — Go to Dashboard → Deposit tokens into the vault
-5. **Trade** — Go to Trade → Fill a pre-existing sell order with your encrypted price
-6. **Auction** — Go to Auctions → Place an encrypted bid on an active auction
-7. **View balances** — Go to Portfolio → See your encrypted balance, click to unseal
-8. **Check reputation** — Go to Reputation → See your trade count and rating
-
-Each interaction follows: **Enter value → Encrypt (6-stage progress) → Confirm TX → Done**
+Each operation serves a clear purpose in business logic. Not padding.
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| FHE Contracts | `@fhenixprotocol/cofhe-contracts` | 0.1.0 |
-| Confidential Tokens | `fhenix-confidential-contracts` | 0.2.0 |
-| Client SDK | `cofhejs` | 0.3.1 |
-| Hardhat Plugin | `cofhe-hardhat-plugin` | 0.3.1 |
-| Smart Contracts | Solidity 0.8.25 | Cancun EVM |
-| Dev Framework | Hardhat | 2.22+ |
-| Frontend | Next.js 14 + React 18 | App Router |
-| Wallet | ethers.js v6 | 6.13+ |
-| Styling | Tailwind CSS + shadcn/ui | Latest |
-| Deployment | Vercel (frontend) | — |
+| Layer | Technology |
+|-------|-----------|
+| **Chain** | Ethereum Sepolia (11155111) |
+| **Contracts** | Solidity 0.8.25, `@fhenixprotocol/cofhe-contracts`, OpenZeppelin |
+| **FHE** | Fhenix CoFHE SDK, TFHE WASM, threshold decryption |
+| **Frontend** | Next.js 16, React 19, TypeScript, Tailwind CSS, Framer Motion |
+| **Wallet** | ethers.js v6, MetaMask |
+| **Testing** | Hardhat, Chai, CoFHE mock environment |
+| **Deployment** | Vercel (frontend), Hardhat (contracts) |
 
 ---
 
-## Local Development
+## Getting Started
+
+**Use the app:**
+
+Visit [cipher-dex.vercel.app](https://cipher-dex.vercel.app), connect MetaMask on Sepolia, get test tokens from faucet, and start trading.
+
+**Run locally:**
 
 ```bash
-# Clone
-git clone https://github.com/your-repo/cipherdex.git
-cd cipherdex
+git clone https://github.com/Ritik200238/CipherDEX.git
+cd CipherDEX
 
-# Install contracts dependencies
+# Contracts
 npm install
-
-# Compile contracts
 npx hardhat compile
-
-# Run tests (mock FHE environment)
 npx hardhat test
 
-# Start frontend
+# Frontend
 cd frontend
 npm install
-npm run dev
+npm run dev          # http://localhost:3000
 ```
 
-### Environment Setup
+**Deploy:**
 
 ```bash
 cp .env.example .env
-# Edit .env with your private key and RPC URLs
-```
+# Add PRIVATE_KEY and RPC URLs
 
-### Deploy to Testnet
-
-```bash
-# Arbitrum Sepolia (recommended)
-npx hardhat run tasks/deploy-all.ts --network arbSepolia
+npx hardhat run tasks/deploy-all.ts --network ethSepolia
+npx hardhat run tasks/setup-permissions.ts --network ethSepolia
+npx hardhat run tasks/verify-all.ts --network ethSepolia
 ```
 
 ---
 
-## Market Opportunity
+## Testing
 
-- **$500M+ lost to MEV annually** — CipherDEX eliminates front-running by encrypting order prices
-- **$2T+ OTC market** — whales need privacy to trade without moving prices
-- **Institutional demand** — funds and treasuries can't use transparent DEXs without leaking strategy
-- **Every private trader is our user** — from retail avoiding sandwich attacks to DAOs managing treasury
+19 test files. 368 tests passing.
+
+```bash
+npx hardhat test
+```
+
+Covers: all auction types, private payments, freelance bidding with milestones + disputes, vesting, allowlists, referrals, settlement vault, reputation, token operations.
 
 ---
 
