@@ -1,0 +1,117 @@
+[
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_vault", "type": "address" },
+      { "internalType": "address", "name": "_registry", "type": "address" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      { "internalType": "string", "name": "title", "type": "string" },
+      { "internalType": "uint256", "name": "escrowAmount", "type": "uint256" },
+      { "internalType": "address", "name": "token", "type": "address" },
+      { "internalType": "string[]", "name": "milestoneDescriptions", "type": "string[]" },
+      { "internalType": "uint256[]", "name": "milestonePercentages", "type": "uint256[]" }
+    ],
+    "name": "postJob",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "jobId", "type": "uint256" },
+      { "components": [{ "internalType": "bytes", "name": "data", "type": "bytes" }], "internalType": "struct InEuint128", "name": "encryptedPrice", "type": "tuple" }
+    ],
+    "name": "submitBid",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "jobId", "type": "uint256" },
+      { "internalType": "address", "name": "freelancer", "type": "address" }
+    ],
+    "name": "acceptBid",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "jobId", "type": "uint256" },
+      { "internalType": "uint256", "name": "milestoneIndex", "type": "uint256" }
+    ],
+    "name": "deliverMilestone",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "jobId", "type": "uint256" },
+      { "internalType": "uint256", "name": "milestoneIndex", "type": "uint256" }
+    ],
+    "name": "approveMilestone",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "jobId", "type": "uint256" },
+      { "internalType": "uint256", "name": "milestoneIndex", "type": "uint256" }
+    ],
+    "name": "disputeMilestone",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getJobCount",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "jobId", "type": "uint256" }],
+    "name": "getJob",
+    "outputs": [
+      { "internalType": "address", "name": "poster", "type": "address" },
+      { "internalType": "string", "name": "title", "type": "string" },
+      { "internalType": "uint256", "name": "escrowAmount", "type": "uint256" },
+      { "internalType": "address", "name": "token", "type": "address" },
+      { "internalType": "uint256", "name": "bidCount", "type": "uint256" },
+      { "internalType": "address", "name": "assignee", "type": "address" },
+      { "internalType": "uint8", "name": "status", "type": "uint8" },
+      { "internalType": "uint256", "name": "milestoneCount", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "jobId", "type": "uint256" },
+      { "internalType": "uint256", "name": "milestoneIndex", "type": "uint256" }
+    ],
+    "name": "getMilestone",
+    "outputs": [
+      { "internalType": "string", "name": "description", "type": "string" },
+      { "internalType": "uint256", "name": "percentage", "type": "uint256" },
+      { "internalType": "uint8", "name": "status", "type": "uint8" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "jobId", "type": "uint256" }],
+    "name": "getMyBid",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

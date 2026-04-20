@@ -7,48 +7,50 @@ import {ISettlementVault} from "../interfaces/ISettlementVault.sol";
 import {IPlatformRegistry} from "../interfaces/IPlatformRegistry.sol";
 import {FHEConstants} from "../libraries/FHEConstants.sol";
 
-interface IAuctionClaim {
+interface IAuctionClaimVA {
     function mint(address winner, address sourceContract, uint256 sourceId, string calldata claimType) external returns (uint256);
 }
 
-/// @title SealedAuction — Sealed-bid token auctions with anti-snipe timer
-/// @notice Seller lists tokens, bidders submit encrypted bids. FHE.gt() + FHE.max()
-///         find the highest bid without revealing any losing bids. Anti-snipe extends
-///         deadline on late bids (amount stays hidden).
-/// @dev Async 2-step flow: closeAuction → wait → revealWinner → settleAuction
-contract SealedAuction is ReentrancyGuard, FHEConstants {
+/// @title VickreyAuction — Second-price sealed-bid auction with FHE
+/// @notice Highest bidder wins but pays the SECOND-highest bid price.
+///         Incentivizes truthful bidding — your dominant strategy is to bid your true value.
+///         Both highest and second-highest bids tracked on ciphertext simultaneously.
+/// @dev FHE ops per bid: gt(1), select(4), max(1), allowThis(4), allow(1) = 11 ops
+///      Tracks: highestBid, highestBidder, secondBid — all encrypted until reveal.
+///      Winner pays secondBid, not their own bid. Classic Vickrey game theory.
+contract VickreyAuction is ReentrancyGuard, FHEConstants {
     enum AuctionStatus { OPEN, CLOSED, REVEALED, SETTLED, CANCELLED }
 
     struct Auction {
         address seller;
-        address token;           // Token being auctioned
-        address paymentToken;    // Token bidders pay with
-        uint256 amount;          // Plaintext: what's for sale (public for discoverability)
-        uint256 deadline;        // Plaintext: public deadline
-        uint256 originalDeadline;
-        uint256 bidCount;        // Plaintext: number of bids (not amounts)
-        euint128 highestBid;     // ENCRYPTED until reveal
-        eaddress highestBidder;  // ENCRYPTED until reveal
-        uint128 revealedBid;     // Set after async decrypt
-        address revealedBidder;  // Set after async decrypt
+        address token;
+        address paymentToken;
+        uint256 amount;
+        uint256 deadline;
+        uint256 bidCount;
+        euint128 highestBid;
+        eaddress highestBidder;
+        euint128 secondBid;       // Second-highest bid — THIS is what winner pays
+        uint128 revealedHighest;
+        uint128 revealedSecond;   // Winner's actual payment
+        address revealedBidder;
         AuctionStatus status;
-        uint256 snipeExtension;  // Seconds to extend on late bids
+        uint256 snipeExtension;
     }
 
     ISettlementVault public vault;
     IPlatformRegistry public registry;
-    IAuctionClaim public claimNFT;
-
-    uint256 public constant PLATFORM_FEE_BPS = 200; // 2%
+    IAuctionClaimVA public claimNFT;
 
     mapping(uint256 => Auction) public auctions;
     mapping(uint256 => mapping(address => euint128)) private bids;
     mapping(uint256 => mapping(address => bool)) public hasBid;
     uint256 public nextAuctionId;
 
-    uint256 public constant DEFAULT_SNIPE_WINDOW = 60;      // Last 60 seconds
-    uint256 public constant DEFAULT_SNIPE_EXTENSION = 120;   // Extend by 2 minutes
-    uint256 public constant MIN_DURATION = 300;               // 5 minutes minimum
+    uint256 public constant DEFAULT_SNIPE_WINDOW = 60;
+    uint256 public constant DEFAULT_SNIPE_EXTENSION = 120;
+    uint256 public constant MIN_DURATION = 300;
+    uint256 public constant PLATFORM_FEE_BPS = 200;
 
     error Unauthorized();
     error InvalidInput();
@@ -59,10 +61,9 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
     event AuctionCreated(uint256 indexed auctionId, address indexed seller, address token, uint256 amount, uint256 deadline);
     event BidPlaced(uint256 indexed auctionId, address indexed bidder, uint256 newDeadline);
     event AuctionClosed(uint256 indexed auctionId);
-    event WinnerRevealed(uint256 indexed auctionId, address winner, uint128 winningBid);
+    event WinnerRevealed(uint256 indexed auctionId, address winner, uint128 winningBid, uint128 pricePaid);
     event AuctionSettled(uint256 indexed auctionId);
     event AuctionCancelled(uint256 indexed auctionId);
-    event TradeCompleted(bytes32 indexed partyAHash, bytes32 indexed partyBHash, uint256 auctionId);
 
     modifier whenNotPaused() {
         if (registry.paused()) revert Paused();
@@ -73,16 +74,11 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
         if (_vault == address(0) || _registry == address(0)) revert InvalidInput();
         vault = ISettlementVault(_vault);
         registry = IPlatformRegistry(_registry);
-        if (_claimNFT != address(0)) claimNFT = IAuctionClaim(_claimNFT);
+        if (_claimNFT != address(0)) claimNFT = IAuctionClaimVA(_claimNFT);
         _initFHEConstants();
     }
 
-    /// @notice Seller creates a new auction
-    /// @param token Token being auctioned
-    /// @param paymentToken Token bidders pay with
-    /// @param amount Amount of tokens for sale (plaintext)
-    /// @param duration Auction duration in seconds
-    /// @param snipeExtension Seconds to extend on late bids (0 = use default)
+    /// @notice Create a Vickrey (second-price) auction
     function createAuction(
         address token,
         address paymentToken,
@@ -98,11 +94,12 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
         uint256 deadline = block.timestamp + duration;
         uint256 ext = snipeExtension > 0 ? snipeExtension : DEFAULT_SNIPE_EXTENSION;
 
-        // Initialize encrypted highest bid to 0 and bidder to zero address
         euint128 initBid = FHE.asEuint128(0);
         eaddress initBidder = FHE.asEaddress(address(0));
+        euint128 initSecond = FHE.asEuint128(0);
         FHE.allowThis(initBid);
         FHE.allowThis(initBidder);
+        FHE.allowThis(initSecond);
 
         auctions[auctionId] = Auction({
             seller: msg.sender,
@@ -110,11 +107,12 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
             paymentToken: paymentToken,
             amount: amount,
             deadline: deadline,
-            originalDeadline: deadline,
             bidCount: 0,
             highestBid: initBid,
             highestBidder: initBidder,
-            revealedBid: 0,
+            secondBid: initSecond,
+            revealedHighest: 0,
+            revealedSecond: 0,
             revealedBidder: address(0),
             status: AuctionStatus.OPEN,
             snipeExtension: ext
@@ -123,9 +121,10 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
         emit AuctionCreated(auctionId, msg.sender, token, amount, deadline);
     }
 
-    /// @notice Submit an encrypted bid on an auction
-    /// @dev FHE ops: gt(1), max(1), select(1) = 3 ops per bid
-    /// @dev Anti-snipe: if bid is in last SNIPE_WINDOW seconds, extends deadline
+    /// @notice Submit encrypted bid — tracks BOTH highest and second-highest on ciphertext
+    /// @dev The key Vickrey logic: when a new bid beats the current highest,
+    ///      the OLD highest becomes the new second. When a new bid is between
+    ///      highest and second, it becomes the new second. All via FHE.select.
     function bid(uint256 auctionId, InEuint128 calldata encBidAmount)
         external
         whenNotPaused
@@ -138,18 +137,39 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
 
         euint128 newBid = FHE.asEuint128(encBidAmount);
 
-        // Core FHE: compare new bid against current highest
-        ebool isHigher = FHE.gt(newBid, auction.highestBid);
+        // Is new bid higher than current highest?
+        ebool isNewHighest = FHE.gt(newBid, auction.highestBid);
 
-        // Update highest bid and bidder using encrypted conditional logic
-        auction.highestBid = FHE.max(newBid, auction.highestBid);
-        auction.highestBidder = FHE.select(isHigher, FHE.asEaddress(msg.sender), auction.highestBidder);
+        // Is new bid higher than current second? (but not highest)
+        ebool isAboveSecond = FHE.gt(newBid, auction.secondBid);
 
-        // ACL: contract needs persistent access for future comparisons
+        // Update second-highest bid:
+        // If new bid is the new highest → old highest becomes second
+        // If new bid is between highest and second → new bid becomes second
+        // If new bid is below second → second stays the same
+        euint128 newSecond = FHE.select(
+            isNewHighest,
+            auction.highestBid,                              // old highest → new second
+            FHE.select(isAboveSecond, newBid, auction.secondBid) // new bid or keep old second
+        );
+
+        // Update highest bid and bidder
+        euint128 newHighest = FHE.select(isNewHighest, newBid, auction.highestBid);
+        eaddress newHighestBidder = FHE.select(
+            isNewHighest,
+            FHE.asEaddress(msg.sender),
+            auction.highestBidder
+        );
+
+        auction.highestBid = newHighest;
+        auction.highestBidder = newHighestBidder;
+        auction.secondBid = newSecond;
+
         FHE.allowThis(auction.highestBid);
         FHE.allowThis(auction.highestBidder);
+        FHE.allowThis(auction.secondBid);
 
-        // Store individual bid (bidder can unseal their own bid later)
+        // Store individual bid for unsealing
         bids[auctionId][msg.sender] = newBid;
         FHE.allowThis(newBid);
         FHE.allow(newBid, msg.sender);
@@ -157,8 +177,7 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
         hasBid[auctionId][msg.sender] = true;
         auction.bidCount++;
 
-        // Anti-snipe: extend deadline if bid is in the last SNIPE_WINDOW seconds
-        // Note: this reveals that A bid was placed (timing metadata), but NOT the amount
+        // Anti-snipe
         uint256 newDeadline = auction.deadline;
         if (block.timestamp > auction.deadline - DEFAULT_SNIPE_WINDOW) {
             newDeadline = block.timestamp + auction.snipeExtension;
@@ -168,8 +187,7 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
         emit BidPlaced(auctionId, msg.sender, newDeadline);
     }
 
-    /// @notice Seller closes the auction and requests async decryption of winner
-    /// @dev Triggers 2-step async decryption. Must wait before calling revealWinner.
+    /// @notice Close auction and request async decryption of all 3 values
     function closeAuction(uint256 auctionId) external {
         Auction storage auction = auctions[auctionId];
         if (auction.seller != msg.sender) revert Unauthorized();
@@ -177,40 +195,48 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
         if (block.timestamp < auction.deadline) revert InvalidState();
         if (auction.bidCount == 0) revert InvalidState();
 
-        // Request async decryption of highest bid and bidder
+        // Decrypt highest bid, second bid, AND winner address
         FHE.decrypt(auction.highestBid);
+        FHE.decrypt(auction.secondBid);
         FHE.decrypt(auction.highestBidder);
 
         auction.status = AuctionStatus.CLOSED;
         emit AuctionClosed(auctionId);
     }
 
-    /// @notice Retrieve decrypted winner after async processing
-    /// @dev Must be called after closeAuction, once co-processor returns results
+    /// @notice Reveal winner after async decryption
     function revealWinner(uint256 auctionId)
         external
-        returns (uint128 winningBid, address winner)
+        returns (uint128 winningBid, uint128 pricePaid, address winner)
     {
         Auction storage auction = auctions[auctionId];
         if (auction.status != AuctionStatus.CLOSED) revert InvalidState();
 
-        // Safe retrieval: returns (value, isReady)
-        (uint128 bidValue, bool bidReady) = FHE.getDecryptResultSafe(auction.highestBid);
-        if (!bidReady) revert InvalidState();
+        (uint128 highest, bool hReady) = FHE.getDecryptResultSafe(auction.highestBid);
+        if (!hReady) revert InvalidState();
 
-        (address bidderValue, bool bidderReady) = FHE.getDecryptResultSafe(auction.highestBidder);
-        if (!bidderReady) revert InvalidState();
+        (uint128 second, bool sReady) = FHE.getDecryptResultSafe(auction.secondBid);
+        if (!sReady) revert InvalidState();
 
-        auction.revealedBid = bidValue;
-        auction.revealedBidder = bidderValue;
+        (address bidder, bool bReady) = FHE.getDecryptResultSafe(auction.highestBidder);
+        if (!bReady) revert InvalidState();
+
+        // Edge case: single bidder → second price = 0. Use reserve or the bid itself.
+        // For fairness: if only 1 bid, winner pays their own bid (no second price advantage)
+        if (second == 0 && auction.bidCount == 1) {
+            second = highest;
+        }
+
+        auction.revealedHighest = highest;
+        auction.revealedSecond = second;
+        auction.revealedBidder = bidder;
         auction.status = AuctionStatus.REVEALED;
 
-        emit WinnerRevealed(auctionId, bidderValue, bidValue);
-        return (bidValue, bidderValue);
+        emit WinnerRevealed(auctionId, bidder, highest, second);
+        return (highest, second, bidder);
     }
 
-    /// @notice Settle the auction — transfer tokens to winner, payment to seller (minus fee)
-    /// @dev Uses plaintext revealed values. Settlement via vault. Mints Claim NFT to winner.
+    /// @notice Settle — winner pays SECOND-highest price (Vickrey mechanism)
     function settleAuction(uint256 auctionId) external nonReentrant {
         Auction storage auction = auctions[auctionId];
         if (auction.status != AuctionStatus.REVEALED) revert InvalidState();
@@ -218,16 +244,15 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
         address winner = auction.revealedBidder;
         if (winner == address(0)) revert InvalidState();
 
-        // Compute fee
-        uint256 fee = (uint256(auction.revealedBid) * PLATFORM_FEE_BPS) / 10000;
-        uint256 sellerReceives = uint256(auction.revealedBid) - fee;
+        // Winner pays the SECOND-highest bid, not their own
+        uint256 pricePaid = uint256(auction.revealedSecond);
+        uint256 fee = (pricePaid * PLATFORM_FEE_BPS) / 10000;
+        uint256 sellerReceives = pricePaid - fee;
 
-        // Encrypt the settlement amounts for vault
         euint64 auctionAmount = FHE.asEuint64(uint64(auction.amount));
         euint64 paymentToSeller = FHE.asEuint64(uint64(sellerReceives));
         euint64 feeAmount = FHE.asEuint64(uint64(fee));
 
-        // Allow vault to access these amounts
         FHE.allowThis(auctionAmount);
         FHE.allowThis(paymentToSeller);
         FHE.allowThis(feeAmount);
@@ -238,34 +263,27 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
         FHE.allowTransient(feeAmount, address(vault));
         FHE.allow(feeAmount, address(vault));
 
-        // Transfer auctioned tokens: seller → winner
+        // Tokens: seller → winner
         vault.settleTrade(auction.seller, winner, auction.token, auctionAmount);
 
-        // Transfer payment: winner → seller (minus fee)
+        // Payment: winner → seller (at SECOND price, not their bid)
         vault.settleTrade(winner, auction.seller, auction.paymentToken, paymentToSeller);
 
-        // Transfer fee: winner → fee collector
+        // Fee: winner → fee collector
         if (fee > 0) {
             vault.settleTrade(winner, registry.feeCollector(), auction.paymentToken, feeAmount);
         }
 
-        // Mint Claim NFT to winner
+        // Mint Claim NFT
         if (address(claimNFT) != address(0)) {
-            claimNFT.mint(winner, address(this), auctionId, "AUCTION");
+            claimNFT.mint(winner, address(this), auctionId, "VICKREY");
         }
 
         auction.status = AuctionStatus.SETTLED;
-
-        bytes32 salt = keccak256(abi.encodePacked(block.number, block.prevrandao));
-        emit TradeCompleted(
-            keccak256(abi.encodePacked(auction.seller, salt)),
-            keccak256(abi.encodePacked(winner, salt)),
-            auctionId
-        );
         emit AuctionSettled(auctionId);
     }
 
-    /// @notice Cancel auction if no bids placed (seller only)
+    /// @notice Cancel if no bids
     function cancelAuction(uint256 auctionId) external {
         Auction storage auction = auctions[auctionId];
         if (auction.seller != msg.sender) revert Unauthorized();
@@ -276,7 +294,7 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
         emit AuctionCancelled(auctionId);
     }
 
-    /// @notice Bidder views their own bid handle (for unsealing)
+    /// @notice Bidder views their own bid handle
     function getMyBid(uint256 auctionId) external view returns (euint128) {
         if (!hasBid[auctionId][msg.sender]) revert InvalidState();
         return bids[auctionId][msg.sender];
@@ -284,22 +302,17 @@ contract SealedAuction is ReentrancyGuard, FHEConstants {
 
     /// @notice Get auction details
     function getAuction(uint256 auctionId) external view returns (
-        address seller,
-        address token,
-        address paymentToken,
-        uint256 amount,
-        uint256 deadline,
-        uint256 bidCount,
-        AuctionStatus status,
-        uint128 revealedBid,
-        address revealedBidder
+        address seller, address token, address paymentToken,
+        uint256 amount, uint256 deadline, uint256 bidCount,
+        AuctionStatus status, uint128 revealedHighest,
+        uint128 revealedSecond, address revealedBidder
     ) {
         Auction storage a = auctions[auctionId];
         return (a.seller, a.token, a.paymentToken, a.amount, a.deadline,
-                a.bidCount, a.status, a.revealedBid, a.revealedBidder);
+                a.bidCount, a.status, a.revealedHighest,
+                a.revealedSecond, a.revealedBidder);
     }
 
-    /// @notice Check if any auctions exist
     function hasAuctions() external view returns (bool) {
         return nextAuctionId > 0;
     }

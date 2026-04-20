@@ -18,17 +18,26 @@ export const FHENIX_TESTNET = {
 
 /** Deployed contract addresses — Ethereum Sepolia */
 export const CONTRACTS = {
-  ConfidentialToken: "0x4F01e01649B5C174122065002e3abbC0a8d057B4",
-  PlatformRegistry: "0x8e2d01c280839c21902405EEee037be51bBf29C3",
-  SettlementVault: "0x0F7843fb5474aE806037A39EB56dF5e54B7AdC35",
-  OrderBook: "0x4d054a38d60Ea29E33806f619DC6A0f5994D9135",
-  SealedAuction: "0x5526C1e86a5c28c0e503dc5a45cCdb3487a7CDaf",
-  Escrow: "0x582CB8E3E395Fb8571D204CfA2C8F1391bA65ADE",
-  LimitOrderEngine: "0x532d003b31716568bf3A684c0a2c39c12FED53E0",
-  BatchAuction: "0x634b8bfAA78224e0e12594447DC0fB1481C3f687",
-  PortfolioTracker: "0xBeE4D40bFb9Fcab8CB800b29713ef8fC9b2f5FcA",
-  Reputation: "0xDBA2b69d6688dA2c9aDb637F18E06Af40a560D05",
-  OTCBoard: "0xC312FbFA6AE09E5d7d19809D8ED3386b0e0750f8",
+  ConfidentialToken: "0xd5524d656477E803a6BE96b5C044CdBb492C8297",
+  PlatformRegistry: "0xC4b6BB51F81eAd8dd65C6Aa26865f4793B2A438f",
+  SettlementVault: "0xa5f512e526aE4E7CBd5e6f4593396d7fcaeE71Cd",
+  OrderBook: "0xeAD0E2a126E3121FCacEb50470AaD38B6F3027a2",
+  AuctionClaim: "0x9c95BEE65C81e1508b37e3f2c240dB65A508c51c",
+  SealedAuction: "0x9F15192dA0520EB7256cDc04730D65D627E92f60",
+  Escrow: "0x2019c9B7B045F782bD63ff7858d2e1fbA502050C",
+  LimitOrderEngine: "0x83B4Df4CcE798a2Ec62Fed8445AdC0936bCF9878",
+  BatchAuction: "0x4503315aD5993647212cd577A3B000053cd90106",
+  PortfolioTracker: "0x9e3139C53c66dfAcd80a6c9f1E78B45939467ffB",
+  Reputation: "0x23e5DdcaF6946123769BBe32BA0Fd6eDd7A973EB",
+  OTCBoard: "0xe643654be7792d0Ba957bc8CECbE74C1e2c28c36",
+  PrivatePayments: "0x04F8b006A299dfE677e108ebd616E2F21c722E34",
+  FreelanceBidding: "0xef9c5d3457CcE981f9641213B81832272383C0FA",
+  VickreyAuction: "0x04270b991B3a9aF98EEc50ee1cadA40Eabc3570e",
+  DutchAuction: "0x44A04fFd7B3F14F279f3F8cEc530C2A21cb04845",
+  OverflowSale: "0x6f5348fF3C725C2DD34E353F1B35d3AE778baA27",
+  TokenVesting: "0x920ee2B93b1C7316811D8aC78F85bbA8bB8518Dc",
+  AllowlistGate: "0x0579B82D5d0F35Ca76DDC0E384D96DfE589fC296",
+  Referrals: "0xc7c63B43365997F02077188c664DE1a33Db3BC3D",
 } satisfies Record<string, string>;
 
 export type ContractName = keyof typeof CONTRACTS;
@@ -43,15 +52,20 @@ export const TOKEN_CONFIG = {
 
 /** Navigation routes */
 export const NAV_ITEMS = [
-  { label: "Dashboard", href: "/", icon: "LayoutDashboard" },
-  { label: "Trade", href: "/trade", icon: "ArrowLeftRight" },
-  { label: "Auctions", href: "/auctions", icon: "Gavel" },
-  { label: "Escrow", href: "/escrow", icon: "ShieldCheck" },
-  { label: "Limit Orders", href: "/limits", icon: "Target" },
-  { label: "Batch Auction", href: "/batch", icon: "Layers" },
-  { label: "Portfolio", href: "/portfolio", icon: "PieChart" },
-  { label: "OTC Board", href: "/otc", icon: "Users" },
-  { label: "Reputation", href: "/reputation", icon: "Star" },
+  { label: "Dashboard", href: "/", icon: "LayoutDashboard", group: "Overview" },
+  { label: "Sealed", href: "/auctions", icon: "Gavel", group: "Token Launch" },
+  { label: "Vickrey", href: "/vickrey", icon: "Eye", group: "Token Launch" },
+  { label: "Dutch", href: "/dutch", icon: "TrendingDown", group: "Token Launch" },
+  { label: "Batch", href: "/batch", icon: "Layers", group: "Token Launch" },
+  { label: "Overflow", href: "/overflow", icon: "Droplets", group: "Token Launch" },
+  { label: "Payments", href: "/payments", icon: "CreditCard", group: "Finance" },
+  { label: "Freelance", href: "/freelance", icon: "Briefcase", group: "Finance" },
+  { label: "Trade", href: "/trade", icon: "ArrowLeftRight", group: "Trading" },
+  { label: "OTC", href: "/otc", icon: "Users", group: "Trading" },
+  { label: "Escrow", href: "/escrow", icon: "ShieldCheck", group: "Trading" },
+  { label: "Limits", href: "/limits", icon: "Target", group: "Trading" },
+  { label: "Portfolio", href: "/portfolio", icon: "PieChart", group: "Analytics" },
+  { label: "Reputation", href: "/reputation", icon: "Star", group: "Analytics" },
 ] as const;
 
 /** Encryption stage labels for progress display */

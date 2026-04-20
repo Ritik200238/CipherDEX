@@ -42,8 +42,15 @@ async function main() {
   const orderBookAddr = await orderBook.getAddress();
   console.log("OrderBook deployed to:", orderBookAddr);
 
+  // Deploy AuctionClaim FIRST (needed by SealedAuction + FreelanceBidding)
+  const AuctionClaim = await ethers.getContractFactory("AuctionClaim");
+  const claimNFT = await AuctionClaim.deploy(deployer.address);
+  await claimNFT.waitForDeployment();
+  const claimAddr = await claimNFT.getAddress();
+  console.log("AuctionClaim deployed to:", claimAddr);
+
   const SealedAuction = await ethers.getContractFactory("SealedAuction");
-  const auction = await SealedAuction.deploy(vaultAddr, registryAddr);
+  const auction = await SealedAuction.deploy(vaultAddr, registryAddr, claimAddr);
   await auction.waitForDeployment();
   const auctionAddr = await auction.getAddress();
   console.log("SealedAuction deployed to:", auctionAddr);
@@ -84,6 +91,60 @@ async function main() {
   const otcAddr = await otcBoard.getAddress();
   console.log("OTCBoard deployed to:", otcAddr);
 
+  // ─── Step 4b: NEW Feature Contracts ───────────────────────
+  console.log("\n--- Step 4b: New Features ---");
+
+  const PrivatePayments = await ethers.getContractFactory("PrivatePayments");
+  const payments = await PrivatePayments.deploy(vaultAddr, registryAddr);
+  await payments.waitForDeployment();
+  const paymentsAddr = await payments.getAddress();
+  console.log("PrivatePayments deployed to:", paymentsAddr);
+
+  const FreelanceBidding = await ethers.getContractFactory("FreelanceBidding");
+  const freelance = await FreelanceBidding.deploy(vaultAddr, registryAddr, deployer.address, claimAddr);
+  await freelance.waitForDeployment();
+  const freelanceAddr = await freelance.getAddress();
+  console.log("FreelanceBidding deployed to:", freelanceAddr);
+
+  const VickreyAuction = await ethers.getContractFactory("VickreyAuction");
+  const vickrey = await VickreyAuction.deploy(vaultAddr, registryAddr, claimAddr);
+  await vickrey.waitForDeployment();
+  const vickreyAddr = await vickrey.getAddress();
+  console.log("VickreyAuction deployed to:", vickreyAddr);
+
+  const DutchAuction = await ethers.getContractFactory("DutchAuction");
+  const dutch = await DutchAuction.deploy(vaultAddr, registryAddr, claimAddr);
+  await dutch.waitForDeployment();
+  const dutchAddr = await dutch.getAddress();
+  console.log("DutchAuction deployed to:", dutchAddr);
+
+  const OverflowSale = await ethers.getContractFactory("OverflowSale");
+  const overflow = await OverflowSale.deploy(vaultAddr, registryAddr);
+  await overflow.waitForDeployment();
+  const overflowAddr = await overflow.getAddress();
+  console.log("OverflowSale deployed to:", overflowAddr);
+
+  // ─── Step 4c: Core Support Contracts ──────────────────────
+  console.log("\n--- Step 4c: Core Support ---");
+
+  const TokenVesting = await ethers.getContractFactory("TokenVesting");
+  const vesting = await TokenVesting.deploy(vaultAddr, deployer.address);
+  await vesting.waitForDeployment();
+  const vestingAddr = await vesting.getAddress();
+  console.log("TokenVesting deployed to:", vestingAddr);
+
+  const AllowlistGate = await ethers.getContractFactory("AllowlistGate");
+  const allowlist = await AllowlistGate.deploy();
+  await allowlist.waitForDeployment();
+  const allowlistAddr = await allowlist.getAddress();
+  console.log("AllowlistGate deployed to:", allowlistAddr);
+
+  const Referrals = await ethers.getContractFactory("Referrals");
+  const referrals = await Referrals.deploy(vaultAddr);
+  await referrals.waitForDeployment();
+  const referralsAddr = await referrals.getAddress();
+  console.log("Referrals deployed to:", referralsAddr);
+
   // ─── Step 5: Set Vault Permissions ────────────────────────
   console.log("\n--- Step 5: Vault Permissions ---");
 
@@ -106,6 +167,45 @@ async function main() {
   await vault.addAuthorizedSettler(otcAddr);
   console.log("Authorized OTCBoard as settler");
 
+  await vault.addAuthorizedSettler(paymentsAddr);
+  console.log("Authorized PrivatePayments as settler");
+
+  await vault.addAuthorizedSettler(freelanceAddr);
+  console.log("Authorized FreelanceBidding as settler");
+
+  await vault.addAuthorizedSettler(vickreyAddr);
+  console.log("Authorized VickreyAuction as settler");
+
+  await vault.addAuthorizedSettler(dutchAddr);
+  console.log("Authorized DutchAuction as settler");
+
+  await vault.addAuthorizedSettler(overflowAddr);
+  console.log("Authorized OverflowSale as settler");
+
+  await vault.addAuthorizedSettler(referralsAddr);
+  console.log("Authorized Referrals as settler");
+
+  // ─── Step 5b: AuctionClaim MINTER_ROLE ────────────────────
+  const MINTER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MINTER_ROLE"));
+  await claimNFT.grantRole(MINTER_ROLE, auctionAddr);
+  await claimNFT.grantRole(MINTER_ROLE, batchAddr);
+  await claimNFT.grantRole(MINTER_ROLE, freelanceAddr);
+  await claimNFT.grantRole(MINTER_ROLE, vickreyAddr);
+  await claimNFT.grantRole(MINTER_ROLE, dutchAddr);
+  console.log("Granted MINTER_ROLE to all auction contracts");
+
+  // ─── Step 5c: TokenVesting authorization ──────────────────
+  await vesting.authorizeCreator(auctionAddr);
+  await vesting.authorizeCreator(batchAddr);
+  await vesting.authorizeCreator(vickreyAddr);
+  await vesting.authorizeCreator(dutchAddr);
+  await vesting.authorizeCreator(overflowAddr);
+  console.log("Authorized auction contracts to create vesting schedules");
+
+  // ─── Step 5d: Vault authorize vesting for settlements ─────
+  await vault.addAuthorizedSettler(vestingAddr);
+  console.log("Authorized TokenVesting as settler");
+
   // ─── Step 6: Register Feature Contracts ───────────────────
   console.log("\n--- Step 6: Registry ---");
 
@@ -117,6 +217,13 @@ async function main() {
   await registry.registerContract(portfolioAddr);
   await registry.registerContract(reputationAddr);
   await registry.registerContract(otcAddr);
+  await registry.registerContract(paymentsAddr);
+  await registry.registerContract(freelanceAddr);
+  await registry.registerContract(vickreyAddr);
+  await registry.registerContract(dutchAddr);
+  await registry.registerContract(overflowAddr);
+  await registry.registerContract(vestingAddr);
+  await registry.registerContract(referralsAddr);
   console.log("Registered all feature contracts");
 
   // ─── Step 7: Set Token Operator (Vault) ───────────────────
@@ -134,6 +241,9 @@ async function main() {
   await reputation.addAuthorizedCaller(auctionAddr);
   await reputation.addAuthorizedCaller(escrowAddr);
   await reputation.addAuthorizedCaller(otcAddr);
+  await reputation.addAuthorizedCaller(vickreyAddr);
+  await reputation.addAuthorizedCaller(dutchAddr);
+  await reputation.addAuthorizedCaller(freelanceAddr);
   console.log("Authorized feature contracts to record trades");
 
   // ─── Summary ──────────────────────────────────────────────
@@ -151,6 +261,15 @@ async function main() {
   console.log(`║ PortfolioTracker:   ${portfolioAddr}`);
   console.log(`║ Reputation:         ${reputationAddr}`);
   console.log(`║ OTCBoard:           ${otcAddr}`);
+  console.log(`║ PrivatePayments:    ${paymentsAddr}`);
+  console.log(`║ FreelanceBidding:   ${freelanceAddr}`);
+  console.log(`║ AuctionClaim:       ${claimAddr}`);
+  console.log(`║ VickreyAuction:     ${vickreyAddr}`);
+  console.log(`║ DutchAuction:       ${dutchAddr}`);
+  console.log(`║ OverflowSale:       ${overflowAddr}`);
+  console.log(`║ TokenVesting:       ${vestingAddr}`);
+  console.log(`║ AllowlistGate:      ${allowlistAddr}`);
+  console.log(`║ Referrals:          ${referralsAddr}`);
   console.log("╚══════════════════════════════════════════════════╝");
 
   // Write addresses to file for frontend consumption
@@ -166,6 +285,15 @@ async function main() {
     PortfolioTracker: portfolioAddr,
     Reputation: reputationAddr,
     OTCBoard: otcAddr,
+    PrivatePayments: paymentsAddr,
+    FreelanceBidding: freelanceAddr,
+    AuctionClaim: claimAddr,
+    VickreyAuction: vickreyAddr,
+    DutchAuction: dutchAddr,
+    OverflowSale: overflowAddr,
+    TokenVesting: vestingAddr,
+    AllowlistGate: allowlistAddr,
+    Referrals: referralsAddr,
   };
 
   const fs = require("fs");

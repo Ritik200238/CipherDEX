@@ -16,46 +16,41 @@ import {
   Star,
   Shield,
   ChevronRight,
+  Eye,
+  TrendingDown,
+  Droplets,
+  CreditCard,
+  Briefcase,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-  LayoutDashboard, ArrowLeftRight, Gavel, ShieldCheck,
-  Target, Layers, PieChart, Users, Star,
+  LayoutDashboard,
+  ArrowLeftRight,
+  Gavel,
+  ShieldCheck,
+  Target,
+  Layers,
+  PieChart,
+  Users,
+  Star,
+  Eye,
+  TrendingDown,
+  Droplets,
+  CreditCard,
+  Briefcase,
 };
 
-const SECTION_MAP: Record<string, string> = {
-  "/": "Overview",
-  "/trade": "Trading",
-  "/auctions": "Trading",
-  "/escrow": "Trading",
-  "/limits": "Trading",
-  "/batch": "Trading",
-  "/portfolio": "Portfolio",
-  "/otc": "Trading",
-  "/reputation": "Portfolio",
-};
+const GROUP_ORDER = ["Overview", "Token Launch", "Finance", "Trading", "Analytics"];
 
 export function Sidebar() {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(false);
 
-  // Group nav items by section
-  const sections: { label: string; items: typeof NAV_ITEMS[number][] }[] = [
-    {
-      label: "Overview",
-      items: NAV_ITEMS.filter((i) => i.href === "/"),
-    },
-    {
-      label: "Trading",
-      items: NAV_ITEMS.filter((i) =>
-        ["/trade", "/auctions", "/escrow", "/limits", "/batch", "/otc"].includes(i.href)
-      ),
-    },
-    {
-      label: "Portfolio",
-      items: NAV_ITEMS.filter((i) => ["/portfolio", "/reputation"].includes(i.href)),
-    },
-  ];
+  // Group nav items by their group property
+  const grouped = GROUP_ORDER.map((group) => ({
+    label: group,
+    items: NAV_ITEMS.filter((i) => i.group === group),
+  })).filter((g) => g.items.length > 0);
 
   return (
     <aside
@@ -73,7 +68,6 @@ export function Sidebar() {
       <div className={`flex items-center h-16 border-b border-[var(--border-subtle)] ${expanded ? "px-5" : "px-0 justify-center"}`}>
         <Link href="/" className="flex items-center gap-3 group">
           <div className="relative w-8 h-8 rounded-lg overflow-hidden shrink-0">
-            {/* Animated gradient background */}
             <div className="absolute inset-0 bg-gradient-to-br from-[var(--cipher-violet)] to-[var(--cipher-cyan)] opacity-90" />
             <div className="absolute inset-0 flex items-center justify-center">
               <Shield size={16} className="text-white drop-shadow-lg" />
@@ -94,7 +88,7 @@ export function Sidebar() {
 
       {/* Navigation sections */}
       <nav className="flex-1 py-3 overflow-y-auto overflow-x-hidden">
-        {sections.map((section) => (
+        {grouped.map((section) => (
           <div key={section.label} className="mb-2">
             {expanded && (
               <p className="px-5 py-1.5 text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-[0.2em]">

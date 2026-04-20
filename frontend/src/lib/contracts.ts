@@ -21,6 +21,11 @@ import BatchAuctionAbi from "./abis/BatchAuction.json";
 import PortfolioTrackerAbi from "./abis/PortfolioTracker.json";
 import ReputationAbi from "./abis/Reputation.json";
 import OTCBoardAbi from "./abis/OTCBoard.json";
+import VickreyAuctionAbi from "./abis/VickreyAuction.json";
+import DutchAuctionAbi from "./abis/DutchAuction.json";
+import OverflowSaleAbi from "./abis/OverflowSale.json";
+import PrivatePaymentsAbi from "./abis/PrivatePayments.json";
+import FreelanceBiddingAbi from "./abis/FreelanceBidding.json";
 
 /** Map contract names to their ABIs */
 export const ABIS: Record<ContractName, ethers.InterfaceAbi> = {
@@ -35,6 +40,11 @@ export const ABIS: Record<ContractName, ethers.InterfaceAbi> = {
   PortfolioTracker: PortfolioTrackerAbi as ethers.InterfaceAbi,
   Reputation: ReputationAbi as ethers.InterfaceAbi,
   OTCBoard: OTCBoardAbi as ethers.InterfaceAbi,
+  VickreyAuction: VickreyAuctionAbi as ethers.InterfaceAbi,
+  DutchAuction: DutchAuctionAbi as ethers.InterfaceAbi,
+  OverflowSale: OverflowSaleAbi as ethers.InterfaceAbi,
+  PrivatePayments: PrivatePaymentsAbi as ethers.InterfaceAbi,
+  FreelanceBidding: FreelanceBiddingAbi as ethers.InterfaceAbi,
 };
 
 /**
