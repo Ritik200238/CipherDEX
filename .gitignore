@@ -53,3 +53,13 @@ tasks/test-burner-faucet.ts
 frontend/render-logo.js
 .beefy-burner.json
 .burner-funder.json
+
+# Internal planning/QA docs — kept local, never published
+/LAUNCH-AUTONOMOUS-QA.md
+/LAUNCH-RUN-LOG.md
+/LAUNCH-DAY-TEST.md
+/LAUNCH-STATUS.md
+/LAUNCH-QA-RESULTS.md
+/PUNCH-LIST.md
+/QA-TESTPLAN.md
+/CONTRACT-REDEPLOY-DECISIONS.md

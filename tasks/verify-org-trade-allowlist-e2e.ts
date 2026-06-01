@@ -1,7 +1,7 @@
 /**
  * Three-in-one E2E: Organization + OrderBook (Trade) + AllowlistGate.
  *
- * Closes the remaining smoke-only ⚠s in CLAUDE.md Phase 2 for these
+ * Closes the remaining smoke-only ⚠s in the build roadmap Phase 2 for these
  * three secondary features. Each gets the minimum tx that proves the
  * encrypted machinery + happy path:
  *

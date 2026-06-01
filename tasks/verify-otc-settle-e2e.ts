@@ -1,7 +1,7 @@
 /**
  * OTCBoard request → quote → accept (full settle round-trip).
  *
- * Closes CLAUDE.md Phase 2 OTC item.
+ * Closes the build roadmap Phase 2 OTC item.
  *
  * Flow:
  *   1. burner1 = REQUESTER posts a fresh request (10-min deadline)

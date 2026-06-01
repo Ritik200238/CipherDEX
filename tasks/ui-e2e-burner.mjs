@@ -17,7 +17,7 @@
 // Why this matters: contract layer E2E (the verify-*.ts hardhat scripts)
 // proves the contracts work. UI E2E proves the UI buttons actually wire
 // to those contracts correctly — which is what 'testnet launch-ready'
-// means in CLAUDE.md.
+// means in the build roadmap.
 
 import { chromium } from "playwright";
 import { Wallet, JsonRpcProvider, getAddress, hexlify, toBeHex } from "ethers";

@@ -1,7 +1,7 @@
 /**
  * SealedAuction multi-bidder + reveal E2E.
  *
- * Proves the headline CLAUDE.md Phase 2 item:
+ * Proves the headline the build roadmap Phase 2 item:
  * "Sealed-Bid Auction: create → 3 bids from 3 wallets → end → reveal winner →
  *  verify losing bids never decrypt (Etherscan trace)."
  *

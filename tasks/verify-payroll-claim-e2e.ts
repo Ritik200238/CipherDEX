@@ -1,7 +1,7 @@
 /**
  * PrivatePayments recipient claim E2E.
  *
- * Closes CLAUDE.md Phase 2 row "Payroll: create split for 3 recipients →
+ * Closes the build roadmap Phase 2 row "Payroll: create split for 3 recipients →
  * each claims own amount."
  *
  *   1. Deployer (rich) creates split #N where the 3 recipients are

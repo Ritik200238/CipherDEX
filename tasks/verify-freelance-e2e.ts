@@ -1,7 +1,7 @@
 /**
  * FreelanceBidding post-job + multi-bid E2E.
  *
- * Closes CLAUDE.md Phase 2 'Freelance: post job → bid → milestone release'
+ * Closes the build roadmap Phase 2 'Freelance: post job → bid → milestone release'
  * for the encrypted bidding portion. The milestone release flow requires a
  * 5-min deadline wait + a TN-signed settle + freelancer deliverMilestone +
  * client approveMilestone, which depends on the encrypted machinery proven

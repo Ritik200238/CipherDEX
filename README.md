@@ -13,7 +13,7 @@ Bidders compete with sealed prices, the chain clears a fair settlement, and losi
 [![Built on Fhenix CoFHE](https://img.shields.io/badge/Built_on-Fhenix_CoFHE-6d28d9?style=flat-square)](https://fhenix.io)
 [![Contracts](https://img.shields.io/badge/Contracts-26_deployed-16a34a?style=flat-square)](#-deployed-contracts)
 [![Tests](https://img.shields.io/badge/Tests-400%2B%20across%2020%20suites-16a34a?style=flat-square)](./test)
-[![On-chain txs](https://img.shields.io/badge/Verified-34_on--chain_txs-16a34a?style=flat-square)](./PHASE-2-VERIFICATION-LOG.md)
+[![On-chain txs](https://img.shields.io/badge/Verified-34_on--chain_txs-16a34a?style=flat-square)](./docs/VERIFICATION-LOG.md)
 [![FHE ops](https://img.shields.io/badge/FHE_ops-26_distinct-6d28d9?style=flat-square)](https://zerith-fi.vercel.app/audit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563eb?style=flat-square)](./LICENSE)
 
@@ -220,7 +220,7 @@ Losing bids:     still-encrypted handles in bids[0][bidder1/bidder2] on-chain,
 | **Freelance · 2 encrypted bids, FHE.lt picks lowest** | [post tx](https://sepolia.etherscan.io/tx/0x58647a9945b06484dd322e6ca48c3f1f6681b3700fe46745af2a7b77da098b94) |
 | **Org + OrderBook + AllowlistGate** | [orderbook](https://sepolia.etherscan.io/tx/0xe5fa5bb756e05d65aaf9840eea9e565a6cf56913a81447d661ac133b8ea0c1a1) |
 | Burner that submitted everything above | [`0x492a…a3e0`](https://sepolia.etherscan.io/address/0x492aaF98150f0542dD8D7F5Df1bE98265809a3e0) |
-| Full verification log (34 txs) | [PHASE-2-VERIFICATION-LOG.md](./PHASE-2-VERIFICATION-LOG.md) |
+| Full verification log (34 txs) | [docs/VERIFICATION-LOG.md](./docs/VERIFICATION-LOG.md) |
 
 </details>
 
@@ -276,7 +276,7 @@ zerith/
 | Solidity sources | **32** files (incl. interfaces + libraries) | `contracts/**/*.sol` |
 | Unit tests | **400+** `it()` cases across **20** suites | [`test/unit/`](./test/unit/) |
 | Test coverage | **20 of 27** product contracts; the 7 newest primitives are E2E-verified on Sepolia, unit tests in progress | [`test/unit/`](./test/unit/) |
-| End-to-end Sepolia transactions verified | **34** | [PHASE-2-VERIFICATION-LOG.md](./PHASE-2-VERIFICATION-LOG.md) |
+| End-to-end Sepolia transactions verified | **34** | [docs/VERIFICATION-LOG.md](./docs/VERIFICATION-LOG.md) |
 | Distinct FHE operations used | **26** | live-counted on [`/audit`](https://zerith-fi.vercel.app/audit) |
 | Auction mechanisms | **5** (Sealed · Vickrey · Dutch · Batch · Overflow) | `contracts/features/` |
 | DAO-finance primitives | **8** | `contracts/features/` |
@@ -356,7 +356,7 @@ zerith/
 - **Formal security audit** — conversations started with leading audit firms (6–10 week lead time).
 - **First foundation design-partner pilot** — real treasury slice, real case study.
 
-> These are not pretended-done. They are the honest work between *shippable testnet protocol* and *mainnet revenue*. See [`KNOWN-ISSUES.md`](./KNOWN-ISSUES.md) and [`CONTRACT-REDEPLOY-DECISIONS.md`](./CONTRACT-REDEPLOY-DECISIONS.md) for the full disclosed gap list.
+> These are not pretended-done. They are the honest work between *shippable testnet protocol* and *mainnet revenue*. See [`docs/KNOWN-ISSUES.md`](./docs/KNOWN-ISSUES.md) for the full disclosed gap list.
 
 ---
 
@@ -365,10 +365,8 @@ zerith/
 | Doc | Purpose |
 |---|---|
 | [Docs site](https://zerith-fi.vercel.app/docs) | SDK reference · sealed-auction lifecycle · threat model · verification recipe |
-| [LAUNCH-QA-RESULTS.md](./LAUNCH-QA-RESULTS.md) | Canonical launch QA — every claim mapped to a tx hash |
-| [PHASE-2-VERIFICATION-LOG.md](./PHASE-2-VERIFICATION-LOG.md) | All 34 verified Sepolia transactions, by feature |
-| [KNOWN-ISSUES.md](./KNOWN-ISSUES.md) | Tracked known issues + resolution plans |
-| [CONTRACT-REDEPLOY-DECISIONS.md](./CONTRACT-REDEPLOY-DECISIONS.md) | Contract-level audit findings + hardening plan |
+| [docs/VERIFICATION-LOG.md](./docs/VERIFICATION-LOG.md) | All 34 verified Sepolia transactions, by feature |
+| [docs/KNOWN-ISSUES.md](./docs/KNOWN-ISSUES.md) | Tracked known issues + resolution plans |
 | [deployed-addresses.json](./deployed-addresses.json) | Source of truth for every live contract address |
 
 ### SDK quick reference
@@ -390,7 +388,7 @@ const tx = await zerith.bid({ auctionId: 0, amount: "1200" });
 ## Security & Disclosures
 
 - **No real funds.** Zerith is live on **testnet only** (Ethereum Sepolia). Do not send mainnet assets.
-- **Self-audited, openly.** The codebase has been put through an extensive internal adversarial audit; findings — including contract-level settlement and privacy-scope items queued for the production deploy — are disclosed in [`KNOWN-ISSUES.md`](./KNOWN-ISSUES.md) and [`CONTRACT-REDEPLOY-DECISIONS.md`](./CONTRACT-REDEPLOY-DECISIONS.md). A **formal third-party audit is queued before mainnet.**
+- **Self-audited, openly.** The codebase has been put through an extensive internal adversarial audit; findings — including contract-level settlement and privacy-scope items queued for the production deploy — are disclosed in [`docs/KNOWN-ISSUES.md`](./docs/KNOWN-ISSUES.md). A **formal third-party audit is queued before mainnet.**
 - **Trust model today.** Protocol ownership is a single deployer key (moving to a 2-of-3 Safe pre-mainnet). The `/audit` page lists the encrypted vs. public surface of every deployed contract.
 - **Responsible disclosure.** Open a GitHub [Security Advisory](https://github.com/Ritik200238/zerith/security/advisories/new), or a public issue tagged `[security]` for non-sensitive reports.
 
