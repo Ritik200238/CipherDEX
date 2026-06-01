@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/zerith-logo.svg" alt="Zerith — Private Finance, powered by FHE" width="240" />
+<img src="assets/zerith-logo.png" alt="Zerith — Private Finance, powered by FHE" width="240" />
 
 ### Sell your treasury without leaking it.
 
